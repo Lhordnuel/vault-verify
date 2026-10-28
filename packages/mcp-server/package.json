@@ -1,0 +1,1 @@
+{"dependencies": {"@vault-verify/core": "^0.1.0"}, "description": "MCP server exposing granted evidence, claims, and reports to AI reviewer clients (stub).", "devDependencies": {"typescript": "^5.5.0"}, "main": "./src/index.ts", "name": "@vault-verify/mcp-server", "private": true, "scripts": {"typecheck": "tsc --noEmit"}, "types": "./src/index.ts", "version": "0.1.0"}

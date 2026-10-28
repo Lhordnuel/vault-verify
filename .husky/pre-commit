@@ -1,0 +1,2 @@
+# Q1: block secret material from being committed.
+npm run check:secrets
