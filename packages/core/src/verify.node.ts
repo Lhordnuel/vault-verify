@@ -137,6 +137,8 @@ export interface SessionVerdict {
  * chain + signatures. L4 additionally requires every supplied anchor to be
  * valid and matching, plus agreeing harness observations with full seq
  * coverage. Anything failing closed reports the specific reason.
+ * Retroactive provenance caps valid chains at L1, or L2 with a valid
+ * server countersignature.
  */
 export function verifySession(
   events: SignedEvent[],
@@ -158,6 +160,49 @@ export function verifySession(
     return { level: 'L0', reasons: [`chain_break:${b.reason}@seq:${b.seq}`] };
   }
   reasons.push(`chain_valid:${chain.count}_events`);
+
+  if (f.provenance === 'retroactive') {
+    // Sealed after the fact: collection credit only. A valid server
+    // countersignature lifts the cap from L1 to L2; anything else fails
+    // closed at L1 with the specific reason.
+    if (anchors.length === 0) {
+      return { level: 'L1', reasons: [...reasons, 'retroactive_unanchored_cap'] };
+    }
+    for (const anchor of anchors) {
+      const parsed = AnchorReceiptSchema.safeParse(anchor);
+      if (!parsed.success) {
+        return { level: 'L1', reasons: [...reasons, 'malformed_anchor', 'retroactive_unanchored_cap'] };
+      }
+      const a = parsed.data;
+      if (!verifyAnchorReceipt(a, f.anchorPublicKey)) {
+        return {
+          level: 'L1',
+          reasons: [...reasons, `anchor_signature_invalid@seq:${a.seq}`, 'retroactive_unanchored_cap'],
+        };
+      }
+      if (a.sessionId !== f.sessionId) {
+        return {
+          level: 'L1',
+          reasons: [...reasons, `anchor_session_mismatch@seq:${a.seq}`, 'retroactive_unanchored_cap'],
+        };
+      }
+      const event = events[a.seq];
+      if (!event || event.seq !== a.seq) {
+        return {
+          level: 'L1',
+          reasons: [...reasons, `anchor_seq_beyond_chain@seq:${a.seq}`, 'retroactive_unanchored_cap'],
+        };
+      }
+      if (event.hash !== a.headHash) {
+        return {
+          level: 'L1',
+          reasons: [...reasons, `anchor_head_mismatch@seq:${a.seq}`, 'retroactive_unanchored_cap'],
+        };
+      }
+    }
+    reasons.push(`anchors_match:${anchors.length}`);
+    return { level: 'L2', reasons: [...reasons, 'retroactive_anchored_cap'] };
+  }
 
   if (anchors.length === 0) {
     return { level: 'L3', reasons: [...reasons, 'no_anchors'] };

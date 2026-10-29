@@ -67,7 +67,19 @@ Vendor-neutral capture in two tiers:
 Tier 2 adapters are **not implemented** — only the `EvidenceAdapter`
 interface in `packages/core` exists.
 
-### 3. Claims & scoring (`Claim`, `RoleRubric`, scoring deferred)
+Retroactive import (`harness import-log <path>`) seals a PAST agent log into
+a fresh hash chain: format parsers (injectable registry; no production
+format yet — `vv-agent-log/1` is test-only) normalize entries into
+`AgentEvent`s through the same classifier as Tier 1, secrets are redacted
+before hashing, prompt text is dropped unless `--include-prompt-text` is
+passed, and unmapped source fields are reported, never silently dropped.
+With anchor credentials the session opens on the server and the head is
+countersigned at import time (verifies up to L2); without them the import
+is fully offline with a self-signed attestation (caps at L1). Imported
+sessions carry provenance `retroactive` and are never uploaded by the
+importer (the raw log never leaves the machine).
+
+### 3. Claims & scoring (`Claim`, `RoleRubric`, session scoring live)
 
 - A `Claim` binds one rubric criterion to ≥1 evidence items plus a
   human-readable assertion. Its verification level is the weakest link:
@@ -76,10 +88,20 @@ interface in `packages/core` exists.
   (`role_id` + `version` is immutable once published; changes ship as a new
   version). Rubrics name which evidence kinds count toward each criterion.
   The first draft exists: `software-engineer-ai` v1 (5 heuristic criteria
-  with visible weights) in `supabase/seed.sql`, awaiting owner edits.
-- The scoring engine that turns claims into per-criterion scores is
-  **deferred**. Reports (layer 5) carry claims and evidence refs, never
-  scores, until scoring is designed and reviewed.
+  with visible weights) in `supabase/seed.sql`, awaiting owner edits; the
+  code template mirrors it in `packages/core/src/rubric.ts`.
+- Session-level heuristic scoring is live (`packages/scoring`): deterministic
+  signals from verified events plus an optional cited LLM judge produce a
+  `FluencyReport` per session. Claim-based scoring and the service-role
+  report builder that attaches scores to grant-based `ScreeningReport`s are
+  still deferred — layer-5 org reports carry claims and evidence refs, and
+  session scores only, until the claim builder is designed and reviewed.
+- Evidence-over-baseline is live: fixed `RoleTemplate`s with weighted
+  must/nice skills, `SkillClaim`s (refs + strongest level + raw signal
+  values, no fit score), and `EvidenceProfile`s (claims + working patterns
+  + level depth + contradiction flags). `computeUplift` adds a capped,
+  never-negative uplift over the Vaultio baseline — zero without evidence,
+  monotone in added evidence, flags never subtract.
 
 ### 4. Consent & access (grant events, RLS, tombstones)
 
@@ -241,7 +263,9 @@ What we do NOT claim:
 
 ## Non-goals for this scaffold
 
-Tier 2 adapter implementations, scoring, real UI screens, MCP
+Tier 2 adapter implementations, claim-based scoring, MCP
 implementation, Supabase Storage integration, and automatic L3/L4 promotion
 (verification exists as pure functions; the promotion pass is deferred).
+Session-level heuristic scoring and fixture-driven report screens are built;
+org-facing grant-based reports with DB/auth wiring are still ahead.
 Contracts live in `packages/core`; build order lives in `tasks/backlog.md`.

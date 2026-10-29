@@ -1,0 +1,263 @@
+{
+  "id": "99999999-9999-9999-9999-999999999999",
+  "candidateId": "88888888-8888-8888-8888-888888888888",
+  "sessionId": "77777777-7777-7777-7777-777777777777",
+  "roleId": "software-engineer-ai",
+  "rubricVersion": 1,
+  "criteria": [
+    {
+      "criterionId": "task-decomposition",
+      "label": "Task decomposition",
+      "weight": 0.25,
+      "score": 0.5944444444444444,
+      "confidence": 1,
+      "citedEventIds": [
+        "seq:0",
+        "seq:1",
+        "seq:2",
+        "seq:3",
+        "seq:4",
+        "seq:5",
+        "seq:6"
+      ],
+      "signals": [
+        {
+          "signal": "recovery-cost",
+          "value": 2,
+          "score": 0.3333333333333333,
+          "citedEventIds": [
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ],
+          "note": "1 failing run(s) never resolved"
+        },
+        {
+          "signal": "revert-count",
+          "value": null,
+          "score": null,
+          "citedEventIds": [],
+          "note": "not Tier-1 measurable (needs adapter context)"
+        }
+      ],
+      "judgments": [
+        {
+          "criterionId": "task-decomposition",
+          "aspect": "decomposition",
+          "score": 0.75,
+          "citedEventIds": [
+            "seq:1",
+            "seq:3",
+            "seq:6"
+          ],
+          "rationale": "Work proceeds in small test-checked steps with one revert and recovery."
+        },
+        {
+          "criterionId": "task-decomposition",
+          "aspect": "instruction-quality",
+          "score": 0.7,
+          "citedEventIds": [
+            "seq:0",
+            "seq:2",
+            "seq:4",
+            "seq:5"
+          ],
+          "rationale": "Repeated short edit cycles suggest focused prompts; no transcript available."
+        }
+      ],
+      "discardedJudgments": 0
+    },
+    {
+      "criterionId": "test-driven-iteration",
+      "label": "Test-driven iteration",
+      "weight": 0.25,
+      "score": 0.8083333333333333,
+      "confidence": 1,
+      "citedEventIds": [
+        "seq:0",
+        "seq:1",
+        "seq:2",
+        "seq:3",
+        "seq:4",
+        "seq:5",
+        "seq:6"
+      ],
+      "signals": [
+        {
+          "signal": "test-follow-share",
+          "value": 0.75,
+          "score": 0.75,
+          "citedEventIds": [
+            "seq:0",
+            "seq:1",
+            "seq:2",
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ]
+        },
+        {
+          "signal": "edit-test-latency",
+          "value": 4,
+          "score": 0.8666666666666667,
+          "citedEventIds": [
+            "seq:0",
+            "seq:1",
+            "seq:2",
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ]
+        }
+      ],
+      "judgments": [],
+      "discardedJudgments": 0
+    },
+    {
+      "criterionId": "change-quality",
+      "label": "Change quality",
+      "weight": 0.2,
+      "score": 0.75,
+      "confidence": 1,
+      "citedEventIds": [
+        "seq:0",
+        "seq:1",
+        "seq:2",
+        "seq:3",
+        "seq:4",
+        "seq:5",
+        "seq:6"
+      ],
+      "signals": [
+        {
+          "signal": "revert-count",
+          "value": null,
+          "score": null,
+          "citedEventIds": [],
+          "note": "not Tier-1 measurable (needs adapter context)"
+        },
+        {
+          "signal": "test-follow-share",
+          "value": 0.75,
+          "score": 0.75,
+          "citedEventIds": [
+            "seq:0",
+            "seq:1",
+            "seq:2",
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ]
+        }
+      ],
+      "judgments": [],
+      "discardedJudgments": 0
+    },
+    {
+      "criterionId": "verification-discipline",
+      "label": "Verification discipline",
+      "weight": 0.15,
+      "score": 0.8722222222222222,
+      "confidence": 1,
+      "citedEventIds": [
+        "seq:0",
+        "seq:1",
+        "seq:2",
+        "seq:3",
+        "seq:4",
+        "seq:5",
+        "seq:6"
+      ],
+      "signals": [
+        {
+          "signal": "test-follow-share",
+          "value": 0.75,
+          "score": 0.75,
+          "citedEventIds": [
+            "seq:0",
+            "seq:1",
+            "seq:2",
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ]
+        },
+        {
+          "signal": "edit-test-latency",
+          "value": 4,
+          "score": 0.8666666666666667,
+          "citedEventIds": [
+            "seq:0",
+            "seq:1",
+            "seq:2",
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ]
+        },
+        {
+          "signal": "hidden-test-outcome",
+          "value": 1,
+          "score": 1,
+          "citedEventIds": []
+        }
+      ],
+      "judgments": [],
+      "discardedJudgments": 0
+    },
+    {
+      "criterionId": "oversight-recovery",
+      "label": "Oversight and recovery",
+      "weight": 0.15,
+      "score": 0.3333333333333333,
+      "confidence": 1,
+      "citedEventIds": [
+        "seq:3",
+        "seq:4",
+        "seq:5",
+        "seq:6"
+      ],
+      "signals": [
+        {
+          "signal": "recovery-cost",
+          "value": 2,
+          "score": 0.3333333333333333,
+          "citedEventIds": [
+            "seq:3",
+            "seq:4",
+            "seq:5",
+            "seq:6"
+          ],
+          "note": "1 failing run(s) never resolved"
+        },
+        {
+          "signal": "revert-count",
+          "value": null,
+          "score": null,
+          "citedEventIds": [],
+          "note": "not Tier-1 measurable (needs adapter context)"
+        }
+      ],
+      "judgments": [],
+      "discardedJudgments": 0
+    }
+  ],
+  "overallScore": 0.6815277777777778,
+  "verification": {
+    "level": "L4",
+    "reasons": [
+      "chain_valid:8_events",
+      "anchors_match:2",
+      "harness_agrees:8/8"
+    ]
+  },
+  "heuristic": true,
+  "generator": "scorer@0.1",
+  "generatedAt": "2026-10-29T00:00:00.000Z"
+}

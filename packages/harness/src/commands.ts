@@ -5,6 +5,7 @@ import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { genesisPrevHashFromNonce, verifyChain } from '@vault-verify/core/node';
 import { gitInit } from './git.js';
+import { importLog } from './importer.js';
 import { loadChainRecords } from './chainstore.js';
 import { loadConfig, parseTaskConfig } from './config.js';
 import { anchorHead, loadSession, registerSession, saveSession } from './session.js';
@@ -211,6 +212,62 @@ export async function finishRun(opts: FinishOptions): Promise<FinishResult> {
     anchors,
     uploaded,
     ...(anchorWarning === undefined ? {} : { anchorWarning }),
+  };
+}
+
+export interface ImportLogRunOptions {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  logPath: string;
+  format?: string;
+  token?: string;
+  includePromptText?: boolean;
+  repoPath?: string;
+}
+
+export interface ImportLogRunResult {
+  sessionId: string;
+  format: string;
+  digest: string;
+  count: number;
+  dir: string;
+  flags: string[];
+  notes: string[];
+  unmappedFields: string[];
+}
+
+/**
+ * Retroactive import. Anchor credentials are OPTIONAL: without them the
+ * import is fully offline (L1 track); with --token (or VAULTVERIFY_JWT)
+ * plus an anchor URL the session opens on the server and the head is
+ * countersigned at import time (L2 track). Nothing is ever uploaded.
+ */
+export async function importLogRun(opts: ImportLogRunOptions): Promise<ImportLogRunResult> {
+  const runsDir = opts.env['VAULTVERIFY_RUNS_DIR'] ?? path.join(opts.cwd, '.vaultverify', 'runs');
+  const supabaseUrl = opts.env['VAULTVERIFY_URL'];
+  const anchorUrl =
+    opts.env['VAULTVERIFY_ANCHOR_URL'] ??
+    (supabaseUrl === undefined ? undefined : `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/session`);
+  const jwt = opts.token ?? opts.env['VAULTVERIFY_JWT'];
+  const server =
+    anchorUrl !== undefined && jwt !== undefined && jwt !== '' ? { anchorUrl, jwt } : undefined;
+  const result = await importLog({
+    logPath: path.resolve(opts.cwd, opts.logPath),
+    runsDir,
+    ...(opts.format === undefined ? {} : { format: opts.format }),
+    ...(server === undefined ? {} : { server }),
+    ...(opts.includePromptText === undefined ? {} : { includePromptText: opts.includePromptText }),
+    ...(opts.repoPath === undefined ? {} : { repoPath: opts.repoPath }),
+  });
+  return {
+    sessionId: result.sessionId,
+    format: result.format,
+    digest: result.digest,
+    count: result.count,
+    dir: result.dir,
+    flags: result.flags,
+    notes: result.notes,
+    unmappedFields: result.unmappedFields,
   };
 }
 

@@ -30,6 +30,7 @@ export const EVIDENCE_KINDS = [
   'prompt_transcript',
   'tool_calls',
   'self_report',
+  'attempt',
 ] as const;
 
 export const EvidenceKindSchema = z.enum(EVIDENCE_KINDS);

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /** Harness CLI entrypoint (thin argv wrapper over commands.ts). */
-import { finishRun, runTests, startRun, watchRun } from './commands.js';
+import { finishRun, importLogRun, runTests, startRun, watchRun } from './commands.js';
 
 function usage(): string {
   return [
     'harness start <task> [--name <run>] [--token <jwt>]  start a run from a template dir',
     'harness test [--dir <run>] [--token <jwt>]           run tests, record + anchor',
     'harness finish [--dir <run>] [--token <jwt>]         snapshot, diff, anchor, upload',
+    'harness import-log <path> [--format <id>] [--token <jwt>] [--include-prompt-text] [--repo <dir>]',
+    '                                                seal a past log (token = server-anchored, else offline L1)',
     '',
     'Env: VAULTVERIFY_URL (required), VAULTVERIFY_JWT (or --token),',
     '     VAULTVERIFY_ANON_KEY (finish only), VAULTVERIFY_ANCHOR_URL, VAULTVERIFY_RUNS_DIR.',
@@ -44,6 +46,37 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv, cwd: string):
           `events: ${result.events}\nhead: ${result.headHash}\nanchors: ${result.anchors}\nuploaded: ${result.uploaded}`,
         );
         if (result.anchorWarning) console.error(`anchor warning: ${result.anchorWarning}`);
+        return 0;
+      }
+      case 'import-log': {
+        const logPath = rest.find((a) => !a.startsWith('--'));
+        if (!logPath) {
+          console.error(
+            'Usage: harness import-log <path> [--format <id>] [--token <jwt>] [--include-prompt-text] [--repo <dir>]',
+          );
+          return 1;
+        }
+        const result = await importLogRun({
+          cwd,
+          env,
+          logPath,
+          format: flag(rest, '--format'),
+          token: flag(rest, '--token'),
+          includePromptText: rest.includes('--include-prompt-text'),
+          repoPath: flag(rest, '--repo'),
+        });
+        console.log(
+          [
+            `session: ${result.sessionId}`,
+            `format: ${result.format}`,
+            `events: ${result.count}`,
+            `digest: ${result.digest}`,
+            `dir: ${result.dir}`,
+            `flags: ${result.flags.length > 0 ? result.flags.join('; ') : 'none'}`,
+            `notes: ${result.notes.length > 0 ? result.notes.join('; ') : 'none'}`,
+            `unmapped: ${result.unmappedFields.length > 0 ? result.unmappedFields.join(', ') : 'none'}`,
+          ].join('\n'),
+        );
         return 0;
       }
       case '_watch': {

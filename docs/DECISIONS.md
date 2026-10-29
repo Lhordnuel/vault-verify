@@ -174,6 +174,143 @@ anchor edge function (deployed), Tier 1 harness CLI, 53 vitest tests green.
   exists outside the Vaultio login flow); handler logic is unit-tested with
   fakes plus core interop tests, and unauthenticated calls verified 401
   against the deployed function.
+- A39. **Rubric source: no owner edits were found.** Phase 4 asked for the
+  criteria "edited in docs/DECISIONS.md", but git history holds only agent
+  commits, the tree was clean, `supabase/seed.sql` is still the verbatim v1
+  draft, and DECISIONS.md only references it. The code template
+  (`packages/core/src/rubric.ts`) is therefore a verbatim copy of the seed
+  v1 id/description/weight/evidenceKinds plus added labels and signal
+  wiring. Owner: review the template (and the seed) and say what to change;
+  template changes ship as rubric v2.
+- A40. Criterion-to-signal wiring (v1): task-decomposition reads
+  recovery-cost + revert-count (+ judge); test-driven-iteration reads
+  test-follow-share + edit-test-latency; change-quality reads revert-count
+  + test-follow-share; verification-discipline adds hidden-test-outcome;
+  oversight-recovery reads recovery-cost + revert-count.
+- A41. Tier 1 signal proxies (adapters change these): recovery-cost counts
+  edit batches between failure and next pass (prompt counts need Tier 2
+  transcripts); revert-count flags snapshots with deletions > insertions;
+  the final-diff checkpoint counts as a diff review for test-follow-share.
+- A42. Judge design: aspects are instruction-quality and decomposition;
+  both feed task-decomposition only (prompting behavior); all other v1
+  criteria are deterministic-only. The judge sees redacted derived events
+  (counts/timings, `redactForJudge`); uncited, miscited, wrong-criterion,
+  malformed, or throwing verdicts are discarded and counted, never fatal.
+  The input verification verdict is echoed untouched.
+- A43. Confidence caps by level (heuristic): L0 0, L1 0.4, L2 0.6, L3 0.8,
+  L4 1.0 (`LEVEL_CONFIDENCE_CAP`). Scoring refuses L0 input outright
+  (`UnverifiableSessionError`): signals are computed only from verified
+  events. Criteria with no applicable signal score null (confidence 0) and
+  are excluded from the weight-renormalized overall.
+- A44. `FluencyReport` (new, core scoring contracts) is the session-level
+  scoring output; the grant-based claims `ScreeningReport` keeps its writer
+  (deferred service-role report builder), which will attach fluency scores
+  later. Citations are session-scoped `seq:<n>` refs.
+- A45. The browser verifier (`@vault-verify/core/web`, @noble/*) is a
+  byte-for-byte twin of the node verifier: same constructions, same reason
+  strings, parity-tested; it skips the constant-time hash compare
+  (node-only hardening, same boolean outcome).
+- A46. Report fixtures are generated with real signatures by the committed
+  `packages/scoring/scripts/generate-fixtures.mjs` (public keys only, no
+  secrets); the tampered sample fails `chain_break:hash_mismatch@seq:2`.
+  The portable session-log format is `vv-session-log/1`
+  (facts + events + anchors).
+- A47. **No sample agent log existed in the repo**, so Phase 5A authored
+  the sanitized `packages/harness/fixtures/sample-agent-log.jsonl`
+  (`vv-agent-log/1`) and built the parser FROM its field names (envelope
+  v/ts/event; edit files[]/summary; test passed/failed; prompt/note text).
+  Real agent formats register as new parsers; the golden test pins the
+  sample's digest + normalized events.
+- A48. Tier 1 proxies retired (supersedes A41's measurement use):
+  `revert-count` always returns null, and the final-diff checkpoint no
+  longer counts as a review in `test-follow-share`. Fixture overall moved
+  0.6631 -> 0.6815 on regeneration.
+- A49. Uplift math (all invariant-tested): per-skill
+  weight * level-strength * min(1, n/3), normalized by template weight;
+  level strengths L0 0 / L1 .25 / L2 .5 / L3 .75 / L4 1. Only max-level and
+  evidence-count feed the math — heuristic scores, fluency score, and
+  flags are ignored — so adding evidence can never lower the result.
+  must/nice is a reporting label (missing skills contribute zero, never
+  subtract). Defaults: range 100, cap 15% of range; uplift also capped by
+  scale headroom. Baselines on a 0..1 scale must pass range 1.
+- A50. Retroactive sessions: `provenance` on HarnessFacts (absent = live,
+  back-compat); both verifiers cap valid retroactive chains at L2 with
+  reason `retroactive_provenance_cap` (anchors not consulted); the
+  "anchor at import time" is a LOCAL self-signed attestation, never
+  presented as a server anchor. Duplicates rejected by content digest;
+  timestamp disorder flagged, not rejected; repo-history corroboration is
+  a note (60min window), never a level change. The importer has no
+  network/upload path at all: the raw log never leaves the machine, and
+  imported evidence has no upload wiring yet.
+- A51. **No live database work in Phase 5A** (DATABASE SAFETY): "schema"
+  means core contracts. Still needing migrations (staging first): the
+  `evidence_items.kind` CHECK gaining 'attempt', plus role_templates,
+  test_definitions, attempts, share_links, and share view-log tables.
+  `EvidenceLibrary` is the in-memory reference for no-cascade delete
+  semantics (roles/screenings/reports hold id references only).
+- A52. Skill slugs (`typescript-node`, ...) are ours until the Vaultio
+  skill taxonomy is mapped. `TestDefinition.seedParameters` maps
+  parameter name -> option count; `deriveAttemptParams` hashes
+  (nonce, test, attempt) under `vv-crypto-1:attempt` and picks
+  byte % count per name (names sorted for determinism).
+- A53. Share links are contract + pure helpers only (generate/hash/
+  active-check/append-only view log); creation, storage, and revocation
+  endpoints are deferred to the service layer. Tokens are shown once;
+  only the hash is stored.
+- A54. Secret-shaped test material is built from runtime fragments so
+  committed files never trip the pre-commit scanner; the redactor is
+  idempotent by construction (redacted output never re-matches) and
+  that property is tested.
+- A55. **fixtures/real/ does not exist.** Searched the repo, Desktop,
+  Downloads, and Documents: no sanitized real log was provided. Phase
+  5A.2 item 1 is therefore staged, not finished: the parser registry
+  is injectable, unmapped-field reporting is plumbed (parser ->
+  ImportResult -> import.json -> CLI), and vv-agent-log/1 is demoted
+  to test-only (out of PARSER_REGISTRY, which is empty until the
+  first real format lands). Drop the log at
+  `packages/harness/fixtures/real/` and the real parser + golden +
+  unmapped-field report follow. v1's own unmapped fields (proving
+  the machinery): `command`, `exit_code`, `output_tail`,
+  `files[].path`.
+- A56. Retroactive verification tiers (both twins, reason-listed):
+  valid chain + matching server countersignature -> L2
+  (`anchors_match:N`, `retroactive_anchored_cap`); valid chain with
+  no/bad anchors -> L1 with the specific anchor reason plus
+  `retroactive_unanchored_cap`; broken chain -> L0 as before. L1
+  here stretches "linked" to mean "digest-bound import record
+  exists" — report-badge copy will need a pass when UI work resumes.
+- A57. Anchored-at-import mode: with --token/VAULTVERIFY_JWT plus an
+  anchor URL, the importer opens a real server session (server nonce
+  + session id + candidate id), seals the chain on it, and stores
+  the server countersignature; failures fail closed (partial dir
+  removed, nothing recorded). Without credentials the import stays
+  fully offline with a self-signed attestation (L1 track) and a
+  note saying so. The stub-anchored online path is test-covered;
+  the live server path is not (same JWT limitation as A38).
+- A58. Uplift rework: per skill only the BEST item counts —
+  weight * quality(best) * level-strength(best.level) — times
+  distinct-source saturation min(1, sessions/3). Best = argmax of
+  the product (first wins ties). Item quality heuristic: test-run
+  pass rate (0 when no tests ran), 0.5 neutral edits (Tier 1
+  cannot assess edit quality), 0.25 notes. SkillClaim carries
+  `best` explicitly. Fluency keeps cite-count saturation (its
+  cites live in one session). All invariants re-tested, plus
+  bad-vs-good session at equal level and 1-source-vs-3-sources.
+- A59. **fixtures/real/ still absent** (re-searched in 5A.3; the
+  Downloads `seed-to-vault...build.log` is a deployment build log,
+  not an agent transcript). Item 1 stays staged per A55: drop the
+  sanitized real log at `packages/harness/fixtures/real/` to
+  unblock the production parser, golden, and unmapped report.
+- A60. Quality heuristic rework (supersedes A58's pass rate): test
+  quality is session-level — final outcome sets the base (pass
+  0.8, fail 0.2), a fail-to-pass recovery adds 0.2 up to 1.0, and
+  no test runs stays neutral at 0.5. All test items in a session
+  share its quality; edits stay 0.5, notes 0.25. Monotonicity now
+  rests on session immutability: sessions are sealed units, so
+  evidence grows by ADDING sessions (best-product and source
+  count only grow); appending records inside an open session can
+  change that session's quality. Tested: recovery >= no-tests,
+  plus all prior invariants.
 
 ## Open questions
 
@@ -190,7 +327,11 @@ anchor edge function (deployed), Tier 1 harness CLI, 53 vitest tests green.
 
 ## Deferred items
 
-Everything in `tasks/backlog.md`: Tier 1 collectors, harness chaining,
-anchor service, session lifecycle, Tier 2 adapters, claim builder, scoring
-engine, report builder + screens, MCP server, Storage integration,
-hardening. Scoring still needs rubric + fairness review before any code.
+Ledger, Tier 1 harness, anchor service, session-level heuristic scoring
+(`packages/scoring`), fixture-driven report screens, the evidence model +
+uplift, and the retroactive importer are built. Still deferred (see
+`tasks/backlog.md`): session/key lifecycle, Tier 2 adapters, claim
+builder, service-role report builder (grant-based org reports), Phase 5A
+DB migrations, share-link endpoints, import upload wiring, MCP server,
+Storage integration, hardening. Scores stay heuristic until the rubric +
+fairness review; the owner still has to review the v1 criteria.

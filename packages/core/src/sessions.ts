@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AnchorReceiptSchema, SignedEventSchema } from './ledger.js';
 import { Hex64Schema, IsoDateTimeSchema, NonceSchema, UuidSchema } from './primitives.js';
 
 /**
@@ -62,5 +63,45 @@ export const HarnessFactsSchema = z.object({
   sessionPublicKey: Hex64Schema,
   anchorPublicKey: Hex64Schema,
   observations: z.array(HarnessObservationSchema),
+  /**
+   * Collection provenance. Absent = live (back-compat). Retroactive
+   * sessions (sealed at import from a past log) verify at most L2.
+   */
+  provenance: z.enum(['live', 'retroactive']).optional(),
 });
 export type HarnessFacts = z.infer<typeof HarnessFactsSchema>;
+
+/**
+ * Portable session log: everything `verifySession` needs (facts, events,
+ * anchors) in one JSON document. The report "Verify this log" panel and
+ * any offline audit consume this shape. Carries public keys only.
+ */
+export const SessionLogSchema = z.object({
+  version: z.literal('vv-session-log/1'),
+  facts: HarnessFactsSchema,
+  events: z.array(SignedEventSchema),
+  anchors: z.array(AnchorReceiptSchema),
+});
+export type SessionLog = z.infer<typeof SessionLogSchema>;
+
+export type SessionLogParse =
+  | { ok: true; data: SessionLog }
+  | { ok: false; issues: string[] };
+
+/** Parse pasted/uploaded JSON into a SessionLog (never throws). */
+export function parseSessionLogText(text: string): SessionLogParse {
+  let json: unknown;
+  try {
+    json = JSON.parse(text) as unknown;
+  } catch {
+    return { ok: false, issues: ['not valid JSON'] };
+  }
+  const parsed = SessionLogSchema.safeParse(json);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`),
+    };
+  }
+  return { ok: true, data: parsed.data };
+}

@@ -1,0 +1,169 @@
+{
+  "version": "vv-session-log/1",
+  "facts": {
+    "sessionId": "77777777-7777-7777-7777-777777777777",
+    "nonce": "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0",
+    "sessionPublicKey": "fda1f4e550469d80a3c7553cc459f6b2de21b83c3b03706839422b3f66042351",
+    "anchorPublicKey": "01b3a51c5505335df35fc382ed65889d7e1614b4b78cb04e011dfbe3ce80071c",
+    "observations": [
+      {
+        "seq": 0,
+        "payloadHash": "9d3c69a6a056360ee62e445dcd2c95ba99629c9d6234bb9dc610dec75f3076ad"
+      },
+      {
+        "seq": 1,
+        "payloadHash": "71bc16fd0a82ac093a6c1169c0e578b781fdb0422a8860fcbe337f46cf8e5adc"
+      },
+      {
+        "seq": 2,
+        "payloadHash": "9e02e706e770a302d0e457d9b1d30651543a209e8d24c67bfe37afb35ae6fb7a"
+      },
+      {
+        "seq": 3,
+        "payloadHash": "2a27856f5a408720663773bd8aa9c9e7af0bdee17f1d2517d20dfe47d9012067"
+      },
+      {
+        "seq": 4,
+        "payloadHash": "e8efceed476333b55aa3b85ca80911dc0a10419bc02aea2543570bd94f81c1bc"
+      },
+      {
+        "seq": 5,
+        "payloadHash": "259edc4b35219de32afe088458ef72d30b6ac8e75eaf28c70843a9a378144b63"
+      },
+      {
+        "seq": 6,
+        "payloadHash": "0c5077e9377cb76f0e01fe6c088654fb580b0f5cb165b07f4b140635d7c1d7e8"
+      },
+      {
+        "seq": 7,
+        "payloadHash": "509600772988b735f3b34cf6292d815500df087a2ccac080e8c56f157a2fe62d"
+      }
+    ]
+  },
+  "events": [
+    {
+      "seq": 0,
+      "prevHash": "5d67259b40c3c2dcb93f9d337742e3708e6b941d4552ded66983b8804662f249",
+      "payload": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "diffstat": " 4 files changed, 120 insertions(+), 0 deletions(-)",
+        "diff": "diff --git a/app.ts b/app.ts\n+demo fixture diff (not real code)",
+        "diffTruncated": false
+      },
+      "hash": "2e318c2c5ac44a91badca974a8b2dcb4e6419e6708d0c4a6ae554e74945744f0",
+      "sig": "498735d22989578a47337061e78a057b0d079f25a2e634f41466a6a1440bcfde93219a657ea65d51d2006e5d9ef6a137c9baa2f0ec2030a0a98110f19dc62309"
+    },
+    {
+      "seq": 1,
+      "prevHash": "2e318c2c5ac44a91badca974a8b2dcb4e6419e6708d0c4a6ae554e74945744f0",
+      "payload": {
+        "command": "npm test",
+        "exitCode": 1,
+        "durationMs": 4200,
+        "passed": 3,
+        "failed": 2,
+        "framework": "vitest",
+        "outputTail": "demo fixture output tail: 3 passed, 2 failed"
+      },
+      "hash": "ed60bdfc92d22929e08b159de5277f1e326f9dc773c9b8d410771b7bbd0a6bdd",
+      "sig": "57cee1122ef333755a0e82c3898ef9d13356907312706991472f9d8cc0e4744c6a3d9277957f499f2349e59ea5bde81a1f5472104fe7680aa4fd16b656253201"
+    },
+    {
+      "seq": 2,
+      "prevHash": "ed60bdfc92d22929e08b159de5277f1e326f9dc773c9b8d410771b7bbd0a6bdd",
+      "payload": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "diffstat": " 2 files changed, 15 insertions(+), 4 deletions(-)",
+        "diff": "diff --git a/app.ts b/app.ts\n+demo fixture diff (not real code)",
+        "diffTruncated": false
+      },
+      "hash": "beb1b8945ffde7e742d3f01b15fb0b3f79a710edff84c26a2f7802a8fe585e5a",
+      "sig": "12bc2be6c208f52fbd01e3ccbe93129e9d5a0e7803e0062df249cfce48b0558c71151673c2540df0e1a10703f47307086fbafb7c16c9b79ae8bf71739bb0f10a"
+    },
+    {
+      "seq": 3,
+      "prevHash": "beb1b8945ffde7e742d3f01b15fb0b3f79a710edff84c26a2f7802a8fe585e5a",
+      "payload": {
+        "command": "npm test",
+        "exitCode": 1,
+        "durationMs": 4200,
+        "passed": 4,
+        "failed": 1,
+        "framework": "vitest",
+        "outputTail": "demo fixture output tail: 4 passed, 1 failed"
+      },
+      "hash": "ceb4eb9364ba22ba6af1e77d9f1f7c944d612b9511c9414c5fa086dd9c1b6cf6",
+      "sig": "941459d9afa1763177e08edae5412639fb2f2f982adc7c448a7d426ea76e346789fd337235a889f1a48700f0f2e6af5eae300110672c45daa1194a94fec73b0c"
+    },
+    {
+      "seq": 4,
+      "prevHash": "ceb4eb9364ba22ba6af1e77d9f1f7c944d612b9511c9414c5fa086dd9c1b6cf6",
+      "payload": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "diffstat": " 1 files changed, 8 insertions(+), 22 deletions(-)",
+        "diff": "diff --git a/app.ts b/app.ts\n+demo fixture diff (not real code)",
+        "diffTruncated": false
+      },
+      "hash": "edbb1aef3b9c24c2ee48435977e8be4aa13f54b682569d43607385b08af833e1",
+      "sig": "160570a0d56fb82f7186b82ac1223de61767b6b0afdc89d81faa702d3688bd3b4ae30af978268b63c44f97148a588d0fc2e48f025dce24ff564ad195ced1540f"
+    },
+    {
+      "seq": 5,
+      "prevHash": "edbb1aef3b9c24c2ee48435977e8be4aa13f54b682569d43607385b08af833e1",
+      "payload": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "diffstat": " 1 files changed, 6 insertions(+), 1 deletions(-)",
+        "diff": "diff --git a/app.ts b/app.ts\n+demo fixture diff (not real code)",
+        "diffTruncated": false
+      },
+      "hash": "46412134975aba740936cef2608a81d84780e7e87d724ddda3ff15d3c1ca49fb",
+      "sig": "b1e6901755b2e8a1a55814486ddb535d32d3e5a609c3e5f073e32b16a9ccc223c6df2f8eae1b4362f319fbbf923e79b19bcf3bd063691986397d27d9501b4700"
+    },
+    {
+      "seq": 6,
+      "prevHash": "46412134975aba740936cef2608a81d84780e7e87d724ddda3ff15d3c1ca49fb",
+      "payload": {
+        "command": "npm test",
+        "exitCode": 0,
+        "durationMs": 4200,
+        "passed": 5,
+        "failed": 0,
+        "framework": "vitest",
+        "outputTail": "demo fixture output tail: 5 passed, 0 failed"
+      },
+      "hash": "04efa64a9534a49e412603bb55e53ab1ef78a8478a6689724dc85daf7a780766",
+      "sig": "fc84eef9b4b2ad28b0b670da9837c2bb52275ee8e4b0ef7ef29edf6263a7aec03f1337a2af0af6f84c698d548d9a15581a0954906be60b2abe8216bd2e89ed09"
+    },
+    {
+      "seq": 7,
+      "prevHash": "04efa64a9534a49e412603bb55e53ab1ef78a8478a6689724dc85daf7a780766",
+      "payload": {
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "diffstat": " 6 files changed, 149 insertions(+), 27 deletions(-)",
+        "diff": "diff --git a/app.ts b/app.ts\n+demo fixture diff (not real code)",
+        "diffTruncated": false,
+        "final": true,
+        "fromCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "toCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "hash": "4b1e9ba45e590b6cac1b90907772b15d1b798626c42dc4f6c2821157980ebbe7",
+      "sig": "183c73d579d0ea529eefc54399bf893955a71ea54fd2067f6f8af36de78c982eb15b8860129216e3acc4be7ea5aa6048ddc3f7ad9fa4634a41bd676ca25bf70f"
+    }
+  ],
+  "anchors": [
+    {
+      "sessionId": "77777777-7777-7777-7777-777777777777",
+      "seq": 3,
+      "headHash": "ceb4eb9364ba22ba6af1e77d9f1f7c944d612b9511c9414c5fa086dd9c1b6cf6",
+      "serverTime": "2026-10-28T10:30:00.000Z",
+      "signature": "7af5a9602fe1d7be1c59e61bb39813b63d99cf4444f50a32889a8a14542b6395021f643860a27b82869b8cc4b1d04192463f2288f57998ed6abd9754d0ac2509"
+    },
+    {
+      "sessionId": "77777777-7777-7777-7777-777777777777",
+      "seq": 7,
+      "headHash": "4b1e9ba45e590b6cac1b90907772b15d1b798626c42dc4f6c2821157980ebbe7",
+      "serverTime": "2026-10-28T10:30:00.000Z",
+      "signature": "a672816c7b603ffc8780c4dc080f9fa200c71e331e6fe64f69ede469ff8d171f060d0ccb7ed96eeb1d09d2b58b9d473cc51c0be5c8c721f42f766b75108d8204"
+    }
+  ]
+}

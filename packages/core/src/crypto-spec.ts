@@ -13,6 +13,7 @@ export const DOMAIN_SEPARATION = {
   session: 'vv-crypto-1:session',
   anchor: 'vv-crypto-1:anchor',
   report: 'vv-crypto-1:report',
+  attempt: 'vv-crypto-1:attempt',
 } as const;
 export type CryptoDomain = (typeof DOMAIN_SEPARATION)[keyof typeof DOMAIN_SEPARATION];
 

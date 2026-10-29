@@ -1,0 +1,50 @@
+[
+  {
+    "seq": 0,
+    "at": "2026-10-28T10:00:00.000Z",
+    "kind": "edit",
+    "label": "Edit (+120/-0)"
+  },
+  {
+    "seq": 1,
+    "at": "2026-10-28T10:03:00.000Z",
+    "kind": "test-fail",
+    "label": "Tests failed (2 failing, 3 passing)"
+  },
+  {
+    "seq": 2,
+    "at": "2026-10-28T10:07:00.000Z",
+    "kind": "edit",
+    "label": "Edit (+15/-4)"
+  },
+  {
+    "seq": 3,
+    "at": "2026-10-28T10:11:00.000Z",
+    "kind": "test-fail",
+    "label": "Tests failed (1 failing, 4 passing)"
+  },
+  {
+    "seq": 4,
+    "at": "2026-10-28T10:14:00.000Z",
+    "kind": "edit",
+    "label": "Edit (+8/-22)"
+  },
+  {
+    "seq": 5,
+    "at": "2026-10-28T10:18:00.000Z",
+    "kind": "edit",
+    "label": "Edit (+6/-1)"
+  },
+  {
+    "seq": 6,
+    "at": "2026-10-28T10:22:00.000Z",
+    "kind": "recovery",
+    "label": "Recovered: tests pass (5 passing)"
+  },
+  {
+    "seq": 7,
+    "at": "2026-10-28T10:25:00.000Z",
+    "kind": "final",
+    "label": "Final diff (149 additions, 27 deletions)"
+  }
+]
