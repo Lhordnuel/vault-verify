@@ -198,6 +198,16 @@ What we do NOT claim:
 - **Metadata leakage.** Chain shape (counts, timing) and anchor rows reveal
   activity patterns even where payloads are hidden. Accepted for now.
 
+## Vaultio integration
+
+VaultVerify shares the Vaultio Supabase project: one `auth.users` means one
+login for both products — no second account. Candidates auto-provision from
+auth users; VaultVerify orgs mirror Vaultio organizations (shared UUIDs)
+with viewer rights derived from team membership; hiring context (profiles,
+verified profiles, assessments, CV data) is readable under Vaultio's own
+RLS. The evidence ledger keeps its own tables, grants, and consent model;
+Vaultio objects are only ever read, never restructured.
+
 ## Non-goals for this scaffold
 
 Collector and adapter implementations, the anchor service, scoring, real

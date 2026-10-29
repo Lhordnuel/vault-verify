@@ -15,7 +15,7 @@ Remaining, in build order. Each item needs design before implementation.
 6. Claim builder: criterion mapping, weakest-link level derivation.
 7. Scoring engine: claims → per-criterion scores against `RoleRubric` (needs rubric + fairness review first).
 8. Report builder (service role): grant-coverage checks, report hashing.
-9. Report screens (auth needs Q9; Vite shell already scaffolded).
+9. Report screens (same Supabase Auth as Vaultio — no second account; providers/session UX still TBD; Vite shell already scaffolded).
 10. MCP server: thin tools for granted evidence/claims/reports (stretch goal).
 11. Supabase Storage integration for large artifacts (`{ uri, sha256 }` payload pointers + storage RLS).
 12. Hardening: harness attestation, duplicate/replay analysis across candidates, metadata-leak review.

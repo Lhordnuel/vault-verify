@@ -33,6 +33,20 @@ questions. Collectors, scoring, and real UI screens are still not built.
   server (anchor) key lives in function secrets only.
 - Q7. **npm workspaces** confirmed.
 
+## Integration resolutions (2026-10-28)
+
+VaultVerify is a Vaultio product: one login, shared context, no second
+account (same project = same `auth.users` by construction).
+
+- I1. **Visible Vaultio data**: identity + hiring context — profiles,
+  verified profiles, assessment history, CV data readable by the report
+  surfaces under Vaultio's own RLS (no schema change; app-level queries).
+- I2. **Org access derives from Vaultio teams**: VaultVerify orgs mirror
+  Vaultio organizations (shared UUIDs); viewer rights = explicit VaultVerify
+  membership UNION active (non-deactivated) team membership.
+- I3. **Candidates auto-provision**: trigger on new auth users + backfill
+  of existing logins (270 rows). A row enables future use only.
+
 ## Assumptions
 
 - A1. Package manager is **npm with workspaces** (`packages/*`, `apps/*`).
@@ -97,6 +111,14 @@ questions. Collectors, scoring, and real UI screens are still not built.
   remote migrations marked reverted in history (their tables/data untouched),
   ledger migrations applied and verified live (10 tables + view, RLS on,
   rubric seeded). Ledger table names verified collision-free.
+- A25. Vaultio tables keep their own RLS, which this project never weakens;
+  context reads ride on Vaultio's self/participant policies. Additive
+  triggers only (one on auth.users, two on organizations).
+- A26. VaultVerify org rows mirror organizations 1:1 (FK on shared id);
+  deleting a Vaultio org cascades to its VaultVerify shares/reports.
+- A27. Team "active" = deactivated_at IS NULL (status domain is
+  Vaultio-owned and not interpreted). Per-item grants still gate every
+  evidence row, so this edge leaks grant metadata at most.
 
 ## Open questions
 
