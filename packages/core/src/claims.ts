@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { EvidenceKindSchema, Hex64Schema, IsoDateTimeSchema, UuidSchema } from './primitives';
-import { VerificationLevelSchema } from './levels';
+import { EvidenceKindSchema, Hex64Schema, IsoDateTimeSchema, UuidSchema } from './primitives.js';
+import { VerificationLevelSchema } from './levels.js';
 
 export const RubricCriterionSchema = z.object({
   id: z.string().min(1).max(80),

@@ -1,2 +1,15 @@
 # Q1: block secret material from being committed.
+# Resolve Node: system-wide first, else the repo-local portable toolchain.
+if ! command -v node >/dev/null 2>&1; then
+  for candidate in .tools/*/node .tools/*/node.exe; do
+    if [ -x "$candidate" ]; then
+      PATH="$PWD/$(dirname "$candidate"):$PATH"
+      break
+    fi
+  done
+fi
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-commit: node/npm not found (set up .tools/ or install Node.js)" >&2
+  exit 1
+fi
 npm run check:secrets

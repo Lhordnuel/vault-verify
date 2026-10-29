@@ -1,21 +1,19 @@
-# Backlog (Phase 3 and beyond)
+# Backlog (post ledger+harness)
 
-Done in Phase 2: core crypto (`vv-crypto-1`, executable), grant events +
-sessions (contracts + migration 2), rubric draft seed (`software-engineer-ai`
-v1, heuristic), report UI shell (Vite + React + Tailwind), pre-commit secret
-check.
+Done in the ledger + Tier 1 phase: executable vv-crypto-1 (hash, genesis,
+sign, verify), verifyChain/verifySession (L0/L3/L4 + reasons), anchor edge
+function (deployed) with migration 5, Tier 1 harness CLI
+(start/test/finish/watch/upload), 53 vitest tests green.
 
 Remaining, in build order. Each item needs design before implementation.
 
-1. Tier 1 harness capture: git repo snapshotter + test wrapper (works with any agent).
-2. Harness chaining service: session registration, seq assignment, hashing, signing (uses core crypto), L0–L2 promotion.
-3. Anchor service: server nonces, checkpoint issuance/verification, L3–L4 promotion (needs Q10 anchor construction).
-4. Session/key lifecycle: expiry, rotation, server-key procedure, compromise cutoff (needs Q11).
-5. Tier 2 adapters: `adapter-claude-code`, `adapter-copilot`, `adapter-muse-code` (transcript parsing).
-6. Claim builder: criterion mapping, weakest-link level derivation.
-7. Scoring engine: claims → per-criterion scores against `RoleRubric` (needs rubric + fairness review first).
-8. Report builder (service role): grant-coverage checks, report hashing.
-9. Report screens (same Supabase Auth as Vaultio — no second account; providers/session UX still TBD; Vite shell already scaffolded).
-10. MCP server: thin tools for granted evidence/claims/reports (stretch goal).
-11. Supabase Storage integration for large artifacts (`{ uri, sha256 }` payload pointers + storage RLS).
-12. Hardening: harness attestation, duplicate/replay analysis across candidates, metadata-leak review.
+1. Session/key lifecycle: expiry, rotation, server-key procedure, compromise cutoff (needs Q11).
+2. Tier 2 adapters: `adapter-claude-code`, `adapter-copilot`, `adapter-muse-code` (transcript parsing).
+3. Claim builder: criterion mapping, weakest-link level derivation.
+4. Scoring engine: claims → per-criterion scores (needs rubric + fairness review first).
+5. Report builder (service role): grant-coverage checks, share-flag checks, report hashing.
+6. Report screens (same Supabase Auth as Vaultio; Vite shell scaffolded).
+7. L3/L4 promotion pass over uploaded evidence (verification functions exist).
+8. MCP server: thin tools for granted evidence/claims/reports (stretch goal).
+9. Supabase Storage integration for large artifacts (`{ uri, sha256 }` payload pointers + storage RLS).
+10. Hardening: harness attestation, duplicate/replay analysis, metadata-leak review.

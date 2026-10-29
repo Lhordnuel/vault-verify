@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IsoDateTimeSchema, UuidSchema } from './primitives';
+import { IsoDateTimeSchema, UuidSchema } from './primitives.js';
 
 /**
  * Q4: grants are append-only events; current state derives from events.

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EvidenceKindSchema, IsoDateTimeSchema, UuidSchema } from './primitives';
+import { EvidenceKindSchema, IsoDateTimeSchema, UuidSchema } from './primitives.js';
 
 /**
  * Unsigned content from a Tier 2 adapter. Adapters parse agent transcripts;

@@ -5,9 +5,9 @@ coding agents. Candidates collect verifiable evidence of their agent-assisted
 work; orgs see only what candidates explicitly grant them, scored against
 fixed per-role rubrics.
 
-Status: Phase 2 applied (decisions Q1–Q7 in `docs/DECISIONS.md`). Crypto,
-sessions, and grant events are live contracts; collectors, anchor service,
-scoring, and real UI screens are still deferred (see `tasks/backlog.md`).
+Status: ledger + Tier 1 harness implemented and tested (53 vitest tests
+green; anchor edge function deployed). Scoring, Tier 2 adapters, and real UI
+screens are still deferred (see `tasks/backlog.md`).
 
 ## The five layers
 
@@ -17,19 +17,30 @@ The source of truth. Every evidence item is a link in a per-candidate
 hash chain:
 
 - `SignedEvent { seq, prevHash, payload, hash, sig }` — the chain link.
-- Crypto spec `vv-crypto-1` (Q2): RFC 8785 (JCS) canonicalization via the
-  `canonicalize` library, sha256, ed25519 (`node:crypto`), lowercase hex.
-  Hash input is domain-separated: `vv-crypto-1:event` + LF + JCS struct
-  (anchor/report domains reserved). Executable form lives in
-  `@vault-verify/core/node`; the universal entrypoint stays browser-safe.
-- Signatures come from **per-session keys** (Q6): each session generates
-  an ed25519 keypair locally on the candidate machine; the private key
-  never leaves it; the public key is registered in `collector_sessions`
-  at session start. `EvidenceItem.sessionId` binds an item to its
-  signing session (absent for L0/L1 unsigned items).
-- `Anchor` — periodic checkpoints over a seq range, bound to a
-  server-issued nonce so a candidate cannot pre-compute or rewrite history
-  without detection. The anchor checkpoint construction is still open (Q10).
+- Crypto spec `vv-crypto-1`: RFC 8785 (JCS) via the `canonicalize`
+  library, sha256, ed25519 (`node:crypto`), lowercase hex. Event hash input
+  is domain-separated: `vv-crypto-1:event` + LF + seq + LF + prevHash + LF
+  + JCS(payload). Executable form lives in `@vault-verify/core/node`; the
+  universal entrypoint stays browser-safe.
+- Genesis binds the chain to its session: the prevHash of seq 0 derives
+  from the server-issued session nonce (`vv-crypto-1:session` domain), so
+  replaying an old chain under a fresh nonce fails verification.
+- Signatures come from **per-session keys**: each session generates an
+  ed25519 keypair locally on the candidate machine; the private key never
+  leaves it; the public key is registered in `collector_sessions` at
+  session start. `EvidenceItem.sessionId` binds an item to its signing
+  session (absent for L0/L1 unsigned items).
+- `verifyChain` checks shape, sequence continuity, linkage, recomputed
+  hashes, and signatures, and reports the first break. `verifySession`
+  returns the highest level earned from verifiable inputs — L3 (valid
+  session-bound chain) or L4 (plus matching anchors and agreeing harness
+  facts); L1/L2 stay collection-time attributions.
+- `Anchor` — the edge function (`supabase/functions/session`) countersigns
+  session heads: the collector sends {sessionId, seq, headHash}; the server
+  stores the anchor and signs {sessionId, seq, headHash, serverTime} with
+  the server key (function secrets only). Unknown sessions and
+  non-increasing seq are rejected; both routes are JWT-authenticated and
+  ownership-checked.
 
 The ledger detects tampering; it does not prevent it. See Threat model.
 
@@ -37,9 +48,15 @@ The ledger detects tampering; it does not prevent it. See Threat model.
 
 Vendor-neutral capture in two tiers:
 
-- **Tier 1 — harness-owned, works with any agent.** The harness owns a git
-  repo snapshotter and a test wrapper. Any agent's work that lands in the
-  repo or runs under the wrapper produces evidence. No per-agent code needed.
+- **Tier 1 — harness-owned, works with any agent** (`packages/harness`).
+  `harness start <task>` copies a task template (a directory with
+  `vaultverify.json`) into a fresh git repo, registers the session, takes
+  the genesis snapshot, and records workspace changes as debounced git
+  snapshots. `harness test` runs the task's test command, emits a test_run
+  event with best-effort pass/fail counts, and anchors the head.
+  `harness finish` snapshots, emits the whole-run diff, self-verifies,
+  anchors, and uploads the chain as L2 evidence via PostgREST. No adapter
+  required (asserted by test).
 - **Tier 2 — optional per-agent adapters** (`packages/adapter-claude-code`,
   `packages/adapter-copilot`, `packages/adapter-muse-code`). Adapters parse
   agent-specific transcripts into prompts and tool calls. They emit
@@ -47,8 +64,8 @@ Vendor-neutral capture in two tiers:
   with the session key. Chain integrity therefore never depends on
   adapter code.
 
-Collectors and adapters are **not implemented** — only the
-`EvidenceAdapter` interface in `packages/core` exists.
+Tier 2 adapters are **not implemented** — only the `EvidenceAdapter`
+interface in `packages/core` exists.
 
 ### 3. Claims & scoring (`Claim`, `RoleRubric`, scoring deferred)
 
@@ -68,7 +85,7 @@ Collectors and adapters are **not implemented** — only the
 
 Candidates own their evidence. Nothing is visible to an org without an
 explicit, revocable, per-item grant tied to a role. Grants are
-**append-only events** (Q4):
+**append-only events**:
 
 - `grant_events`: `issued` (item ids, role, optional expiry) and `revoked`
   rows keyed by `grant_id`. No UPDATE/DELETE policies — the log cannot be
@@ -106,7 +123,7 @@ candidate works with any agent                        collector_sessions
         │
         ▼
 Tier 1 harness capture (git snapshot, test wrapper) ──┐
-Tier 2 adapter parse (prompts, tool calls, unsigned) ──┤
+Tier 2 adapter parse (prompts, tool calls, unsigned) ──┤ (deferred)
         │                                             │
         ▼                                             ▼
 harness chains + signs (session key) ──► SignedEvents ──► evidence_items
@@ -114,10 +131,10 @@ harness chains + signs (session key) ──► SignedEvents ──► evidence_i
         ▼                                                        ▼
 anchor service (nonce + checkpoint) ──► anchors ──► L3/L4 promotion
                                                                  │
-candidate reviews ──► claims (criterion + items) ────────────────┤
+candidate reviews ──► claims (criterion + items) ────────────────┤ (deferred)
 candidate grants ──► grant_events (issued/revoked; state derived) ┤
                                                                  ▼
-org requests ──► report builder (service role) ──► screening_reports
+org requests ──► report builder (service role) ──► screening_reports (deferred)
                                                                  │
                                               ┌────────────────────┴────────────┐
                                               ▼                                 ▼
@@ -158,6 +175,18 @@ Stored on every evidence item. Ordered; higher subsumes lower.
 Promotion is one-way and recomputed by the harness, never asserted by the
 candidate. Claims inherit the minimum level of their cited items.
 
+## Vaultio integration
+
+VaultVerify shares the Vaultio Supabase project: one `auth.users` means one
+login for both products — no second account. Candidates auto-provision from
+auth users; VaultVerify orgs mirror Vaultio organizations (shared UUIDs)
+with viewer rights derived from team membership; hiring context (profiles,
+verified profiles, assessments, CV data) is readable under Vaultio's own
+RLS. The evidence ledger keeps its own tables, grants, and consent model;
+Vaultio objects are only ever read, never restructured. Talent context
+(CV, linked profiles, GitHub) joins live per candidate via the
+`talent_context` view; OAuth tokens and credentials are never selected.
+
 ## Threat model & honest limits
 
 **Tamper-evident, not tamper-proof.** The ledger makes quiet rewriting
@@ -167,7 +196,11 @@ determined candidate from misbehaving outside the harness. Specifically:
 What we detect:
 
 - Post-hoc editing, deletion, or reordering of chained evidence
-  (hash mismatch, seq gap, signature failure).
+  (hash mismatch, seq gap, signature failure) — covered by tests.
+- Chain replay under a fresh session (genesis nonce mismatch) — covered
+  by tests.
+- Forged or mismatched anchors (signature, session, head checks) —
+  covered by tests.
 - Backdating or pre-computation (anchor nonces are server-issued and
   unpredictable; anchors commit to seq ranges).
 - Grant forgery or scope creep (grants are an append-only event log;
@@ -185,11 +218,15 @@ What we do NOT claim:
   that the candidate understands the code. Rubrics and reviewers bridge that gap.
 - **Session-key compromise.** A leaked session private key lets an attacker
   mint that session's history until expiry/revocation. Blast radius is
-  bounded to one session by design (Q6); rotation means starting a new
-  session. The compromise-cutoff procedure is still open (Q11).
+  bounded to one session by design; rotation means starting a new session.
+  The compromise-cutoff procedure is still open (Q11).
 - **Server-key compromise.** The anchor signing key lives in Supabase
   function secrets only; if it leaks, anchors are forgeable. Storage and
   rotation of that key need an explicit procedure (part of Q11).
+- **Anchor endpoint abuse.** Session creation and anchoring require a valid
+  user JWT plus session ownership, with strictly increasing seq — but a
+  compromised JWT can anchor arbitrary heads for its own sessions. Defense
+  in depth: heads must still match a valid chain to earn L4.
 - **Harness subversion.** A modified harness binary on the candidate's
   machine can lie at collection time. Mitigations (attestation, reproducible
   builds, server-side cross-checks) are future work.
@@ -197,20 +234,14 @@ What we do NOT claim:
   candidates are detectable only if someone looks (deferred analysis).
 - **Metadata leakage.** Chain shape (counts, timing) and anchor rows reveal
   activity patterns even where payloads are hidden. Accepted for now.
-
-## Vaultio integration
-
-VaultVerify shares the Vaultio Supabase project: one `auth.users` means one
-login for both products — no second account. Candidates auto-provision from
-auth users; VaultVerify orgs mirror Vaultio organizations (shared UUIDs)
-with viewer rights derived from team membership; hiring context (profiles,
-verified profiles, assessments, CV data) is readable under Vaultio's own
-RLS. The evidence ledger keeps its own tables, grants, and consent model;
-Vaultio objects are only ever read, never restructured.
+- **Live authenticated edge calls.** The anchor handler is unit-tested and
+  unauthenticated calls verified 401 against the deployed function, but a
+  full JWT-authenticated round trip is still untested (no user JWT exists
+  outside the Vaultio login flow).
 
 ## Non-goals for this scaffold
 
-Collector and adapter implementations, the anchor service, scoring, real
-UI screens, MCP implementation, and Supabase Storage integration.
-Contracts for all of them live in `packages/core`; the crypto contract
-(`vv-crypto-1`) is executable; build order lives in `tasks/backlog.md`.
+Tier 2 adapter implementations, scoring, real UI screens, MCP
+implementation, Supabase Storage integration, and automatic L3/L4 promotion
+(verification exists as pure functions; the promotion pass is deferred).
+Contracts live in `packages/core`; build order lives in `tasks/backlog.md`.

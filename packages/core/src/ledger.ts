@@ -7,8 +7,8 @@ import {
   IsoDateTimeSchema,
   NonceSchema,
   UuidSchema,
-} from './primitives';
-import { VerificationLevelSchema } from './levels';
+} from './primitives.js';
+import { VerificationLevelSchema } from './levels.js';
 
 /**
  * One link in a candidate's hash chain.
@@ -62,22 +62,48 @@ export const EvidenceItemSchema = z.object({
 export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;
 
 /**
- * Periodic checkpoint over a seq range, bound to a server-issued nonce so a
- * candidate cannot pre-compute or rewrite history without detection.
+ * Stored anchor: the server countersigns a session chain head. fromSeq is the
+ * previously anchored head + 1 (0 for the first anchor of a session).
  */
 export const AnchorSchema = z
   .object({
     id: UuidSchema,
     candidateId: UuidSchema,
+    sessionId: UuidSchema,
     fromSeq: z.number().int().min(0),
     toSeq: z.number().int().min(0),
-    /** Checkpoint hash committing to events fromSeq..toSeq (exact construction: harness spec, deferred). */
+    /** Chain head hash at toSeq. */
     anchorHash: Hex64Schema,
+    /** Session nonce (denormalized from the session for audit). */
     nonce: NonceSchema,
-    /** Anchor service identity, e.g. 'anchor/vault-verify@0.1'. */
+    /** Anchor service identity, e.g. 'anchor/session@1'. */
     issuer: z.string().min(1).max(120),
+    /** Server countersignature over canonical {sessionId, seq, headHash, serverTime}. */
     signature: Hex128Schema,
     anchoredAt: IsoDateTimeSchema,
   })
   .refine((a) => a.toSeq >= a.fromSeq, { message: 'toSeq must be >= fromSeq' });
 export type Anchor = z.infer<typeof AnchorSchema>;
+
+/** Collector -> anchor service: checkpoint this session head. */
+export const AnchorRequestSchema = z.object({
+  sessionId: UuidSchema,
+  seq: z.number().int().min(0),
+  headHash: Hex64Schema,
+});
+export type AnchorRequest = z.infer<typeof AnchorRequestSchema>;
+
+/**
+ * Anchor service -> collector: countersigned checkpoint. Canonical form for
+ * the signature is JCS over keys in order headHash, seq, serverTime,
+ * sessionId, hashed under vv-crypto-1:anchor (see verifyAnchorReceipt; the
+ * edge handler constructs the identical byte order by hand).
+ */
+export const AnchorReceiptSchema = z.object({
+  sessionId: UuidSchema,
+  seq: z.number().int().min(0),
+  headHash: Hex64Schema,
+  serverTime: IsoDateTimeSchema,
+  signature: Hex128Schema,
+});
+export type AnchorReceipt = z.infer<typeof AnchorReceiptSchema>;

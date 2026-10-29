@@ -1,6 +1,12 @@
 /**
- * Node-only executable crypto (Q2). Import from `@vault-verify/core/node`.
- * Never imported by the universal entrypoint (browser safety).
+ * Node-only executable crypto (ledger spec vv-crypto-1).
+ * Import from `@vault-verify/core/node`. Never imported by the universal
+ * entrypoint (browser safety).
+ *
+ * Constructions (see docs/DECISIONS.md for rationale):
+ * - eventHash = sha256hex(`vv-crypto-1:event` LF seq LF prevHash LF JCS(payload))
+ * - genesis prevHash = sha256hex(`vv-crypto-1:session` LF sessionNonce)
+ * - signatures: ed25519 over hash bytes, lowercase hex.
  */
 import {
   createHash,
@@ -12,10 +18,15 @@ import {
   verify,
   type KeyObject,
 } from 'node:crypto';
-import canonicalize from 'canonicalize';
-import { DOMAIN_SEPARATION, hashInput } from './crypto-spec';
-import { Hex128Schema, Hex64Schema } from './primitives';
-import { SessionKeypairSchema, type SessionKeypair } from './sessions';
+import { createRequire } from 'node:module';
+import { z } from 'zod';
+import { DOMAIN_SEPARATION, hashInput } from './crypto-spec.js';
+import { Hex128Schema, Hex64Schema, NonceSchema } from './primitives.js';
+import { SessionKeypairSchema, type SessionKeypair } from './sessions.js';
+
+// `canonicalize` is CJS without ESM-typed exports: require it explicitly.
+const require = createRequire(import.meta.url);
+const canonicalize = require('canonicalize') as (input: unknown) => string | undefined;
 
 /** RFC 8785 canonical JSON. Throws for non-JSON values. */
 export function canonicalJson(value: unknown): string {
@@ -31,10 +42,28 @@ export function sha256HexUtf8(input: string): string {
   return createHash('sha256').update(input, 'utf8').digest('hex');
 }
 
-/** Chain-link hash over the event struct (domain: vv-crypto-1:event). */
+/** Chain-link hash over seq, prevHash, and canonical payload. */
 export function hashEventStruct(input: { seq: number; prevHash: string; payload: unknown }): string {
-  const struct = canonicalJson({ prevHash: input.prevHash, payload: input.payload, seq: input.seq });
-  return Hex64Schema.parse(sha256HexUtf8(hashInput(DOMAIN_SEPARATION.event, struct)));
+  const seq = z.number().int().min(0).parse(input.seq);
+  const prevHash = Hex64Schema.parse(input.prevHash);
+  const framed = `${DOMAIN_SEPARATION.event}\n${seq}\n${prevHash}\n${canonicalJson(input.payload)}`;
+  return Hex64Schema.parse(sha256HexUtf8(framed));
+}
+
+/**
+ * Genesis prevHash for a session chain, derived from the server-issued
+ * session nonce. Binds the whole chain to its session (replaying an old
+ * chain under a fresh nonce fails genesis verification).
+ */
+export function genesisPrevHashFromNonce(nonce: string): string {
+  return Hex64Schema.parse(
+    sha256HexUtf8(hashInput(DOMAIN_SEPARATION.session, NonceSchema.parse(nonce))),
+  );
+}
+
+/** Canonical payload digest for harness observations (bare JCS sha256). */
+export function observationPayloadHash(payload: unknown): string {
+  return Hex64Schema.parse(sha256HexUtf8(canonicalJson(payload)));
 }
 
 function base64UrlToHex(input: string): string {
@@ -69,6 +98,19 @@ function privateKeyFromSeedHex(seedHex: string): KeyObject {
     format: 'der',
     type: 'pkcs8',
   });
+}
+
+/**
+ * Derive the ed25519 public key (hex) from a seed — e.g. to publish the
+ * anchor public key that verifiers check countersignatures against.
+ */
+export function publicKeyFromSeedHex(seedHex: string): string {
+  const derived = createPublicKey(privateKeyFromSeedHex(seedHex));
+  const jwk = derived.export({ format: 'jwk' });
+  if (typeof jwk.x !== 'string') {
+    throw new Error('[vault-verify] public key export failed');
+  }
+  return Hex64Schema.parse(base64UrlToHex(jwk.x));
 }
 
 function publicKeyFromHex(publicKeyHex: string): KeyObject {
@@ -111,8 +153,9 @@ export function verifyHashSignature(
 }
 
 /**
- * Full chain-link verification: recompute the hash (constant-time compare),
- * then verify the signature against the session public key.
+ * Single-link check: hash recomputation (constant-time compare) plus
+ * signature verification. Checks NEITHER sequence continuity NOR genesis
+ * binding — use verifyChain for full verification.
  */
 export function verifyEventSignature(
   event: { seq: number; prevHash: string; payload: unknown; hash: string; sig: string },

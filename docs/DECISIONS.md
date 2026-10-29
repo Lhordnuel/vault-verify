@@ -46,6 +46,11 @@ account (same project = same `auth.users` by construction).
   membership UNION active (non-deactivated) team membership.
 - I3. **Candidates auto-provision**: trigger on new auth users + backfill
   of existing logins (270 rows). A row enables future use only.
+- I4. **Talent context linkage**: `talent_context` view (security_invoker)
+  joins profiles, CV, verified profile, online presence, and GitHub analysis
+  per candidate, latest-row-wins. Excluded always: `candidate_github_credentials`,
+  `linkedin_oauth_token`, OAuth PII mirrors, billing/wallet/referral
+  columns, internal fetch logs.
 
 ## Assumptions
 
@@ -119,6 +124,56 @@ account (same project = same `auth.users` by construction).
 - A27. Team "active" = deactivated_at IS NULL (status domain is
   Vaultio-owned and not interpreted). Per-item grants still gate every
   evidence row, so this edge leaks grant metadata at most.
+- A28. `talent_context` MUST keep `security_invoker = true`: a default view
+  owned by postgres would bypass Vaultio RLS. Our candidates RLS gates the
+  row; Vaultio RLS gates each context group. The service-role report builder
+  bypasses RLS and MUST therefore honor share flags itself
+  (shared_with_recruiters, is_public, show_*).
+- A29. `candidate_github_analysis` has RLS on with zero Vaultio policies, so
+  it resolves NULL for interactive roles (service-side only). Live GitHub
+  context flows via `candidate_online_presence`. Vaultio can add a self-read
+  policy there if candidates should see it in-app; this project will not
+  modify Vaultio RLS.
+
+## Ledger + Tier 1 harness phase (user's Phase 2)
+
+Implemented and tested: executable ledger crypto, verifyChain/verifySession,
+anchor edge function (deployed), Tier 1 harness CLI, 53 vitest tests green.
+
+- A30. Hash construction reconciles the phase formula with Q2: sha256hex of
+  `vv-crypto-1:event` LF seq LF prevHash LF JCS(payload). The domain prefix
+  stands; JCS covers the payload per the formula. No chains existed, so the
+  construction change from the earlier scaffold breaks nothing.
+- A31. Genesis prevHash derives from the server-issued session nonce (sha256
+  under `vv-crypto-1:session`). GENESIS_PREV_HASH (64 zeros) remains only as
+  the verifyChain default for sessionless/legacy checks.
+- A32. verifySession returns L0/L3/L4 only; L1/L2 are collection-time
+  attributions the harness stamps (L2 at upload), since verification inputs
+  cannot retroactively establish provenance.
+- A33. Strict anchors: L4 needs >=1 valid matching anchor AND zero invalid
+  ones; any forged/mismatched anchor caps at L3 with its reason. Harness
+  observations need full seq coverage, else L3.
+- A34. Anchor routes take a user JWT (ownership-checked); no anonymous
+  session creation; seq strictly increasing per session. Request signing by
+  session key deferred: both secrets live on the same machine, so it adds
+  no threat-model value today.
+- A35. Harness: templates are user-provided dirs with vaultverify.json (no
+  sample shipped); snapshots debounced on change via a detached recorder;
+  test counts best-effort per runner (null when unknown); `test` records
+  even on failure and propagates the exit code; finish self-verifies,
+  anchors best-effort, uploads fatally (PostgREST upsert, deterministic
+  row ids); L2 stamped at collection, promotion deferred.
+- A36. Server anchor key generated into function secrets (value never
+  logged); rotation procedure still open (old pubkey must be retained for
+  old anchors); anchor public key distribution deferred to the builder phase.
+- A37. Toolchain: portable Node under .tools/ (gitignored); core+harness
+  build to dist (NodeNext ESM, .js extensions enforced); single Vite 7
+  across vitest+report; `canonicalize` required explicitly (CJS without
+  ESM-typed default).
+- A38. Live edge invocation with a real user JWT remains untested (no JWT
+  exists outside the Vaultio login flow); handler logic is unit-tested with
+  fakes plus core interop tests, and unauthenticated calls verified 401
+  against the deployed function.
 
 ## Open questions
 

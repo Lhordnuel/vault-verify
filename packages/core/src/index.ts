@@ -1,5 +1,5 @@
-export { VERIFICATION_LEVELS, VerificationLevelSchema } from './levels';
-export type { VerificationLevel } from './levels';
+export { VERIFICATION_LEVELS, VerificationLevelSchema } from './levels.js';
+export type { VerificationLevel } from './levels.js';
 
 export {
   UuidSchema,
@@ -10,7 +10,7 @@ export {
   EVIDENCE_KINDS,
   EvidenceKindSchema,
   CollectionTierSchema,
-} from './primitives';
+} from './primitives.js';
 export type {
   Uuid,
   IsoDateTime,
@@ -19,10 +19,23 @@ export type {
   Nonce,
   EvidenceKind,
   CollectionTier,
-} from './primitives';
+} from './primitives.js';
 
-export { GENESIS_PREV_HASH, SignedEventSchema, EvidenceItemSchema, AnchorSchema } from './ledger';
-export type { SignedEvent, EvidenceItem, Anchor } from './ledger';
+export {
+  GENESIS_PREV_HASH,
+  SignedEventSchema,
+  EvidenceItemSchema,
+  AnchorSchema,
+  AnchorRequestSchema,
+  AnchorReceiptSchema,
+} from './ledger.js';
+export type {
+  SignedEvent,
+  EvidenceItem,
+  Anchor,
+  AnchorRequest,
+  AnchorReceipt,
+} from './ledger.js';
 
 export {
   RubricCriterionSchema,
@@ -30,14 +43,14 @@ export {
   ClaimSchema,
   VerificationSummarySchema,
   ScreeningReportSchema,
-} from './claims';
+} from './claims.js';
 export type {
   RubricCriterion,
   RoleRubric,
   Claim,
   VerificationSummary,
   ScreeningReport,
-} from './claims';
+} from './claims.js';
 
 export {
   GrantEventTypeSchema,
@@ -46,7 +59,7 @@ export {
   GrantEventSchema,
   GrantStatusSchema,
   GrantStateSchema,
-} from './access';
+} from './access.js';
 export type {
   GrantEventType,
   GrantIssuedEvent,
@@ -54,26 +67,43 @@ export type {
   GrantEvent,
   GrantStatus,
   GrantState,
-} from './access';
+} from './access.js';
 
-export { CollectorSessionSchema, SessionKeypairSchema } from './sessions';
-export type { CollectorSession, SessionKeypair } from './sessions';
+export {
+  CollectorSessionSchema,
+  SessionKeypairSchema,
+  SessionStartRequestSchema,
+  SessionStartResponseSchema,
+  HarnessObservationSchema,
+  HarnessFactsSchema,
+} from './sessions.js';
+export type {
+  CollectorSession,
+  SessionKeypair,
+  SessionStartRequest,
+  SessionStartResponse,
+  HarnessObservation,
+  HarnessFacts,
+} from './sessions.js';
 
-export { CRYPTO_SPEC_VERSION, DOMAIN_SEPARATION, hashInput } from './crypto-spec';
-export type { CryptoDomain } from './crypto-spec';
+export { CRYPTO_SPEC_VERSION, DOMAIN_SEPARATION, hashInput } from './crypto-spec.js';
+export type { CryptoDomain } from './crypto-spec.js';
 
-// NOTE: `./crypto.node` (node:crypto signing/verification) is intentionally
-// NOT re-exported here. It is a separate node-only entrypoint:
+// NOTE: `./node` (node:crypto signing/verification) is intentionally NOT
+// re-exported here. It is a separate node-only entrypoint:
 // `@vault-verify/core/node`. Keeps browser bundles free of node:crypto.
 
 export {
   UnsignedEventSchema,
   AdapterCollectInputSchema,
   AdapterCollectOutputSchema,
-} from './adapter';
+} from './adapter.js';
 export type {
   UnsignedEvent,
   AdapterCollectInput,
   AdapterCollectOutput,
   EvidenceAdapter,
-} from './adapter';
+} from './adapter.js';
+
+export { TalentContextSchema } from './vaultio.js';
+export type { TalentContext } from './vaultio.js';
