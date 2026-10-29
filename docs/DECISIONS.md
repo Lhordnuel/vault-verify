@@ -92,6 +92,11 @@ questions. Collectors, scoring, and real UI screens are still not built.
 - A23. Supabase link state is user-local (`supabase login` + `supabase
   link`); the project ref is read from the linked config, never from repo
   files or chat.
+- A24. Co-located in the Vaultio Supabase project (owner decision
+  2026-10-28; supersedes the dedicated-project constraint): 11 pre-existing
+  remote migrations marked reverted in history (their tables/data untouched),
+  ledger migrations applied and verified live (10 tables + view, RLS on,
+  rubric seeded). Ledger table names verified collision-free.
 
 ## Open questions
 
