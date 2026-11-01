@@ -8,14 +8,13 @@
  */
 import { execFileSync } from 'node:child_process';
 
-const ALLOWLISTED_NAMES = new Set(['.env.example']);
+const ALLOWLISTED_NAMES = new Set(['.dev.vars.example']);
 
 const BLOCKED_NAME_RULES = [
   { re: /(^|\/)\.env(\..+)?$/, label: 'dotenv file (only .env.example may be committed)' },
   { re: /\.pem$/i, label: 'PEM file' },
   { re: /(^|\/)(id_rsa|id_ed25519)$/, label: 'SSH private key file' },
   { re: /\.key$/i, label: '.key file' },
-  { re: /(^|\/)supabase\/\.(temp|branches)\//, label: 'supabase CLI state dir' },
 ];
 
 // Fragments keep any single line from matching its own rule.
@@ -27,7 +26,7 @@ const CONTENT_RULES = [
   { re: new RegExp(BEGIN + '.*' + PRIV + FENCE), label: 'PEM private key block' },
   {
     re: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-    label: 'JWT-like token (Supabase keys are JWTs)',
+    label: 'JWT-like token',
   },
   { re: /sk-[A-Za-z0-9]{20,}/, label: 'sk- style secret key' },
   { re: /ghp_[A-Za-z0-9]{20,}/, label: 'GitHub personal access token' },
@@ -37,7 +36,7 @@ const CONTENT_RULES = [
 const MAX_BLOB_BYTES = 512 * 1024;
 
 function stagedPaths() {
-  const out = execFileSync('git', ['diff', '--cached', '--name-only', '-z'], { encoding: 'utf8' });
+  const out = execFileSync('git', ['diff', '--cached', '--diff-filter=ACMR', '--name-only', '-z'], { encoding: 'utf8' });
   return out.split('\0').filter((p) => p.length > 0);
 }
 
@@ -71,7 +70,7 @@ for (const path of stagedPaths()) {
 if (violations.length > 0) {
   console.error('[check:secrets] blocked — possible secret material in staged files:');
   for (const v of violations) console.error(`  - ${v}`);
-  console.error('Remove the secret (use .env locally / function secrets in Supabase), unstage, and retry.');
+  console.error('Remove the secret, unstage the file, and retry.');
   process.exit(1);
 }
 console.log('[check:secrets] clean');

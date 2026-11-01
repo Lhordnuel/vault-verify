@@ -1,1 +1,0 @@
-{"compilerOptions": {"declaration": true, "isolatedModules": true, "lib": ["ES2022"], "module": "NodeNext", "moduleResolution": "NodeNext", "noUnusedLocals": true, "noUnusedParameters": true, "resolveJsonModule": true, "skipLibCheck": true, "esModuleInterop": true, "strict": true, "target": "ES2022"}}

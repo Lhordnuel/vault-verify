@@ -1,0 +1,29 @@
+name = "attest-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-30"
+workers_dev = true
+routes = [{ pattern = "attest.sh/api/*", zone_name = "attest.sh" }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "attest-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "attest-artifacts"
+
+[[queues.producers]]
+binding = "GRADE_QUEUE"
+queue = "grade-queue"
+
+[[queues.consumers]]
+queue = "grade-queue"
+max_batch_size = 1
+max_retries = 3
+
+[ai]
+binding = "AI"
+
+[vars]
+APP_ORIGIN = "https://attest.sh"

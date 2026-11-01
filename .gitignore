@@ -2,8 +2,13 @@ node_modules/
 dist/
 *.tsbuildinfo
 .env
-.env.local
-supabase/.branches/
-supabase/.temp/
+.env.*
+!.dev.vars.example
 .husky/_/
 .tools/
+.attest/
+apps/api/.dev.vars
+apps/api/dist/
+apps/api/.wrangler/
+apps/web/dist/
+packages/cli/dist/
