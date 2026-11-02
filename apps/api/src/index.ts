@@ -57,7 +57,9 @@ app.get('/api/auth/github/callback', async (c) => {
   setCookie(c, 'attest_session', session.token, {
     httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
   });
-  return c.redirect(c.env.APP_ORIGIN ?? new URL(c.req.url).origin);
+  const dashboard = new URL(c.env.APP_ORIGIN ?? new URL(c.req.url).origin);
+  dashboard.pathname = `/v/${encodeURIComponent(session.user.handle)}`;
+  return c.redirect(dashboard.toString());
 });
 
 app.post('/api/cli/device', async (c) => {

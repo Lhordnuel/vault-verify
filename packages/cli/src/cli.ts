@@ -45,6 +45,7 @@ async function login(apiUrl: string): Promise<void> {
     const result = await responseJson<{ token: string; handle: string }>(poll);
     await writeConfig({ apiUrl, token: result.token, handle: result.handle });
     console.log(`Signed in as @${result.handle}.`);
+    console.log(`Evidence profile: ${apiUrl}/v/${encodeURIComponent(result.handle)}`);
     return;
   }
   throw new Error('GitHub sign-in expired. Run `attest login` to try again.');
