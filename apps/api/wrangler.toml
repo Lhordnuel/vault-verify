@@ -1,4 +1,4 @@
-name = "attest-api"
+name = "vault-verify"
 main = "src/index.ts"
 compatibility_date = "2026-10-30"
 workers_dev = true
