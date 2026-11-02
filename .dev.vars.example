@@ -1,9 +1,4 @@
 GH_CLIENT_ID=replace-with-github-oauth-client-id
 GH_CLIENT_SECRET=replace-with-github-oauth-client-secret
 SESSION_SECRET=replace-with-a-long-random-secret
-APP_ORIGIN=http://localhost:5173
-# Optional: AI Gateway Workers AI endpoint, e.g. https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/workers-ai
-# AI_GATEWAY_BASE_URL=
-# AI_GATEWAY_TOKEN=
-# Optional Meta Llama provider key. When set, this replaces the Workers AI binding.
-# META_LLAMA_API_KEY=
+META_LLAMA_API_KEY=replace-with-meta-llama-api-key

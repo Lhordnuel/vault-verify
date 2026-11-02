@@ -6,9 +6,9 @@ Evidence comes before scores. Assessment scores are shown with exact quotes from
 
 ## Stack
 
-- `apps/web`: Vite, React, Tailwind, CodeMirror; deploy the `apps/web` build output to Cloudflare Pages.
-- `apps/api`: Hono on Cloudflare Workers; GitHub OAuth/device flow, D1, R2, Queues, Workers AI, and an optional AI Gateway or Meta Llama API provider.
-- `packages/cli`: Node.js CLI published as `npx attest`; scans git history, saves a local preview, and syncs only after confirmation.
+- `apps/web`: Vite, React, Tailwind, CodeMirror; built and served as static assets by the Cloudflare Worker.
+- `apps/api`: Hono on Cloudflare Workers; GitHub OAuth/device flow, D1, R2, Queues, and Meta Llama API grading.
+- `packages/cli`: Node.js CLI; scans git history, saves a local preview, and syncs only after confirmation.
 - `packages/core`: shared evidence contracts and deterministic chain hashing.
 
 ## Local development
@@ -16,53 +16,57 @@ Evidence comes before scores. Assessment scores are shown with exact quotes from
 Requirements: Node.js 20+, npm, Git, and Wrangler.
 
 ```sh
-npm install
-npm run dev:api
-npm run dev
+npm.cmd install
+npm.cmd run dev:api
+npm.cmd run dev
 ```
 
 In another terminal, apply the schema to local D1:
 
 ```sh
-npm run db:local -w @attest/api
+npm.cmd run db:local -w @attest/api
 ```
 
-Set local Worker secrets in `apps/api/.dev.vars` (copy `.dev.vars.example` and replace the placeholders). Register a GitHub OAuth app with callback `http://127.0.0.1:8787/api/auth/github/callback` for local browser sign-in. Set `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `SESSION_SECRET` (a long random value), and `APP_ORIGIN=http://127.0.0.1:5173`. GitHub device flow is used by the CLI.
+Copy `.dev.vars.example` to `apps/api/.dev.vars` and set `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `SESSION_SECRET` (a long random value), and `META_LLAMA_API_KEY`. Register a GitHub OAuth app with callback `http://127.0.0.1:8787/api/auth/github/callback` for local browser sign-in. The local Worker command sets `APP_ORIGIN=http://127.0.0.1:5173` automatically. GitHub device flow is used by the CLI. Until OAuth credentials are configured, clicking sign-in explains the missing setup instead of silently sending you to GitHub.
 
-Open `http://localhost:5173`. In any git repository, the CLI commands are:
+Open `http://localhost:5173`. From the Attest source repository, the CLI commands are:
 
 ```sh
-npx attest login
-npx attest scan
-npx attest sync
-npx attest wipe
+.\attest.cmd login
+.\attest.cmd scan
+.\attest.cmd sync
+.\attest.cmd wipe
 ```
+
+The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. Invoke it by full path from another git repository while keeping that repository as the current directory; the scanner uses the current directory. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
 
 `scan` writes only to `.attest/scan.json`; it does not upload. `sync` prints the complete JSON request, explains that it replaces the previous evidence snapshot, asks for confirmation, and only then uploads it. `wipe` requires a separate confirmation and deletes that account's uploaded evidence, assessments, and R2 artifacts.
 
 ## Cloudflare resources and deployment
 
-The Worker config is `apps/api/wrangler.toml`; D1 schema and the initial rubric are in `apps/api/schema.sql`. Provision these resources in your Cloudflare account (resource creation and deploy are intentionally not run by this repo setup):
+The Worker config is `apps/api/wrangler.toml`; D1 schema and the initial rubric are in `apps/api/schema.sql`. D1 (`attest-db`) and Queue (`grade-queue`) were created in the connected Cloudflare account. R2 must be enabled for the account in Cloudflare before creating the artifact bucket:
 
 ```sh
-npx wrangler d1 create attest-db
-npx wrangler r2 bucket create attest-artifacts
-npx wrangler queues create grade-queue
+npx.cmd wrangler r2 bucket create attest-artifacts
 ```
 
-Copy the D1 database ID into `apps/api/wrangler.toml`. Configure the Worker's `AI` binding (Llama 3.3 70B and Llama 4 Scout are invoked by the API), and set production secrets:
+The D1 ID is already configured. Apply the schema and create the bucket before deploying. The Worker serves the built Vite app and API from one `workers.dev` origin; a separate Pages project and unconfigured `attest.sh` DNS route are not required for the demo.
 
 ```sh
-npx wrangler secret put GH_CLIENT_ID
-npx wrangler secret put GH_CLIENT_SECRET
-npx wrangler secret put SESSION_SECRET
+npm.cmd run db:remote -w @attest/api
+Set-Location apps\api
+npx.cmd wrangler r2 bucket create attest-artifacts
+npx.cmd wrangler secret put GH_CLIENT_ID
+npx.cmd wrangler secret put GH_CLIENT_SECRET
+npx.cmd wrangler secret put SESSION_SECRET
+npx.cmd wrangler secret put META_LLAMA_API_KEY
 ```
 
-Set `APP_ORIGIN=https://attest.sh`. For AI Gateway observability, set `AI_GATEWAY_BASE_URL` to the account/gateway Workers AI endpoint and optionally `AI_GATEWAY_TOKEN`. If `META_LLAMA_API_KEY` is set, the pluggable client uses Meta's OpenAI-compatible endpoint instead of the Workers AI binding.
+Use your GitHub OAuth App credentials, a random `SESSION_SECRET`, and your Meta Llama API key. Enter secrets only into Wrangler's secure prompt; never commit them. Llama 3.3 70B generates tests and grades pass one; Llama 4 Scout grades pass two.
 
-Deploy the Worker with `npm run deploy -w @attest/api`, then publish `apps/web` as a Cloudflare Pages project with build command `npm run build -w @attest/web` and output directory `apps/web/dist`. The Worker route in `wrangler.toml` serves `/api/*` on `attest.sh`.
+Deploy the complete app (API plus static assets) with `npm.cmd run deploy -w @attest/api`. Register the GitHub OAuth callback as `<workers.dev URL>/api/auth/github/callback`, set `ATTEST_API_URL` to that URL in the terminal for CLI use, then test `login`, `scan`, `sync`, and `wipe`.
 
-To publish the CLI as `npx attest`, publish the public `@attest/core` workspace first, then `packages/cli` (`npm publish -w @attest/core`, then `npm publish -w attest`). Set `VITE_AI_GATEWAY_DASHBOARD_URL` in the Pages build environment to show a dashboard link on assessment results.
+Publishing the CLI to npm still requires an available owned package scope and npm login. Until then use the Windows `.cmd` launcher rather than `npx attest`.
 
 ## API
 

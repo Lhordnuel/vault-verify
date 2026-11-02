@@ -8,6 +8,8 @@ dist/
 .tools/
 .attest/
 apps/api/.dev.vars
+apps/api/.dev.vars.*
+!apps/api/.dev.vars.example
 apps/api/dist/
 apps/api/.wrangler/
 apps/web/dist/

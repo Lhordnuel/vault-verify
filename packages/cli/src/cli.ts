@@ -51,7 +51,9 @@ async function login(apiUrl: string): Promise<void> {
 }
 
 program.command('login').description('Sign in with GitHub using a device code.').action(async () => {
-  await login(program.opts<{ api: string }>().api || 'https://attest.sh');
+  const apiUrl = program.opts<{ api: string }>().api;
+  if (!apiUrl) throw new Error('Set ATTEST_API_URL or pass --api <url> to choose the Attest Worker.');
+  await login(apiUrl);
 });
 
 program.command('scan').description('Scan local git history and save a private evidence preview.').option('--limit <n>', 'maximum commits', '100').action(async (options: { limit: string }) => {

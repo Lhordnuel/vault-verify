@@ -12,19 +12,28 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 const AUTH_STATE_COOKIE = 'attest_oauth_state';
 
 app.use('/api/*', async (c, next) => {
-  const allowedOrigin = c.env.APP_ORIGIN ?? 'https://attest.sh';
+  const allowedOrigin = c.env.APP_ORIGIN ?? new URL(c.req.url).origin;
   return cors({ origin: allowedOrigin, allowHeaders: ['Content-Type', 'Authorization'], allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], credentials: true })(c, next);
 });
 
-app.get('/api/health', (c) => c.json({ ok: true, service: 'attest-api' }));
+app.get('/api/health', (c) => c.json({
+  ok: true,
+  service: 'attest-api',
+  readiness: {
+    github: Boolean(c.env.GH_CLIENT_ID && c.env.GH_CLIENT_SECRET),
+    session: Boolean(c.env.SESSION_SECRET),
+    meta_ai: Boolean(c.env.META_LLAMA_API_KEY),
+  },
+}));
 
 app.get('/api/auth/github', (c) => {
+  if (!c.env.GH_CLIENT_ID) return c.text('GitHub sign-in is not configured. Set GH_CLIENT_ID in apps/api/.dev.vars.', 503);
   const state = randomToken();
   const appOrigin = c.env.APP_ORIGIN ?? new URL(c.req.url).origin;
   setCookie(c, AUTH_STATE_COOKIE, state, { httpOnly: true, secure: appOrigin.startsWith('https://'), sameSite: 'Lax', path: '/', maxAge: 600 });
   const params = new URLSearchParams({
     client_id: c.env.GH_CLIENT_ID,
-    redirect_uri: `${appOrigin}/api/auth/github/callback`,
+    redirect_uri: `${new URL(c.req.url).origin}/api/auth/github/callback`,
     scope: 'read:user',
     state,
   });
@@ -48,10 +57,11 @@ app.get('/api/auth/github/callback', async (c) => {
   setCookie(c, 'attest_session', session.token, {
     httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Lax', path: '/', maxAge: 30 * 24 * 60 * 60,
   });
-  return c.redirect(c.env.APP_ORIGIN ?? 'https://attest.sh');
+  return c.redirect(c.env.APP_ORIGIN ?? new URL(c.req.url).origin);
 });
 
 app.post('/api/cli/device', async (c) => {
+  if (!c.env.GH_CLIENT_ID) return c.json({ error: 'github_sign_in_not_configured' }, 503);
   const response = await fetch('https://github.com/login/device/code', {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
@@ -64,6 +74,9 @@ app.post('/api/cli/device', async (c) => {
 });
 
 app.post('/api/cli/device/token', async (c) => {
+  if (!c.env.GH_CLIENT_ID || !c.env.GH_CLIENT_SECRET || !c.env.SESSION_SECRET) {
+    return c.json({ error: 'github_sign_in_not_configured' }, 503);
+  }
   const body = await c.req.json<{ device_code?: string }>();
   if (!body.device_code) return c.json({ error: 'device_code_required' }, 400);
   const response = await fetch('https://github.com/login/oauth/access_token', {
@@ -97,8 +110,8 @@ app.post('/api/cli/sync', requireUser, async (c) => {
   } catch {
     return c.json({ error: 'invalid_json' }, 400);
   }
-  if (!Array.isArray(body.evidence) || body.evidence.length === 0 || body.evidence.length > 200) {
-    return c.json({ error: 'evidence_must_contain_between_1_and_200_items' }, 400);
+  if (!Array.isArray(body.evidence) || body.evidence.length === 0 || body.evidence.length > 100) {
+    return c.json({ error: 'evidence_must_contain_between_1_and_100_items' }, 400);
   }
   const userId = c.get('user').id;
   const statements: D1PreparedStatement[] = [];

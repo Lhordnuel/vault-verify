@@ -2,12 +2,11 @@ name = "attest-api"
 main = "src/index.ts"
 compatibility_date = "2026-10-30"
 workers_dev = true
-routes = [{ pattern = "attest.sh/api/*", zone_name = "attest.sh" }]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "attest-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "278d52ab-62bf-47c0-9b90-4b8d7e7d65da"
 
 [[r2_buckets]]
 binding = "ARTIFACTS"
@@ -22,8 +21,8 @@ queue = "grade-queue"
 max_batch_size = 1
 max_retries = 3
 
-[ai]
-binding = "AI"
-
-[vars]
-APP_ORIGIN = "https://attest.sh"
+[assets]
+directory = "../web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

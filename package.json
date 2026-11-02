@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "npm run dev -w @attest/web",
     "dev:api": "npm run dev -w @attest/api",
-    "build": "npm run build -w @attest/core && npm run build -w attest && npm run build -w @attest/api && npm run build -w @attest/web",
-    "typecheck": "npm run build -w @attest/core && npm run typecheck -w attest && npm run typecheck -w @attest/api && npm run typecheck -w @attest/web",
+    "build": "npm run build -w @attest/core && npm run build -w @attest/cli && npm run build -w @attest/api",
+    "typecheck": "npm run build -w @attest/core && npm run typecheck -w @attest/cli && npm run typecheck -w @attest/api && npm run typecheck -w @attest/web",
     "test": "vitest run",
     "check:secrets": "node scripts/check-secrets.mjs"
   },
