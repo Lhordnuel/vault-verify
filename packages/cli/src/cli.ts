@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Command } from 'commander';
 import { loadScan, readConfig, saveScan, scanRepository, writeConfig } from './evidence.js';
-import type { SyncPayload } from '@attest/core';
+import { parseSessionLogText, sessionEvidenceFromImport, type SyncPayload } from '@attest/core';
 
 const program = new Command();
 program.name('attest').description('Create and share evidence-backed developer credentials.').version('0.1.0');
@@ -56,15 +58,29 @@ program.command('login').description('Sign in with GitHub using a device code.')
   await login(apiUrl);
 });
 
-program.command('scan').description('Scan local git history and save a private evidence preview.').option('--limit <n>', 'maximum commits', '100').action(async (options: { limit: string }) => {
+program.command('scan')
+  .description('Scan git history and optionally import an AI session log into a private preview.')
+  .option('--limit <n>', 'maximum commits', '100')
+  .option('--session <path>', 'import a Claude Code JSONL or normalized Attest/Vaultio session log')
+  .action(async (options: { limit: string; session?: string }) => {
   const cwd = process.cwd();
   const payload = await scanRepository(cwd, Number.parseInt(options.limit, 10));
+  if (options.session) {
+    const text = await readFile(path.resolve(cwd, options.session), 'utf8');
+    const imported = await parseSessionLogText(text);
+    const sessionEvidence = await sessionEvidenceFromImport(imported);
+    payload.evidence.push(...sessionEvidence);
+    console.log(`Imported ${sessionEvidence.length} session events (${imported.format}, ${imported.level}).`);
+    console.log(`Session source: ${imported.sessionId}. ${imported.reasons.join('; ')}.`);
+  }
   await saveScan(cwd, payload);
-  console.log(`Scanned ${payload.evidence.length} commits. Evidence is local only; nothing was uploaded.`);
+  console.log(`Scanned ${payload.evidence.length} evidence records. Evidence is local only; nothing was uploaded.`);
   console.log(`Preview saved to ${cwd}\\.attest\\scan.json. Review it before running attest sync.`);
   for (const item of payload.evidence) {
-    console.log(`\n${item.evidence_ref.commit_hash.slice(0, 10)}  ${item.claim_type}  ${item.claim_value}`);
-    console.log(`  Evidence: ${item.evidence_ref.quote.replace(/\n/g, '\n  ')}`);
+    const ref = item.evidence_ref;
+    const sourceId = 'commit_hash' in ref ? ref.commit_hash.slice(0, 10) : `${ref.session_id}:${ref.event_id}`;
+    console.log(`\n${sourceId}  ${item.claim_type}  ${item.claim_value}`);
+    console.log(`  Evidence: ${ref.quote.replace(/\n/g, '\n  ')}`);
   }
 });
 

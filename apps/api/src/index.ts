@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { createChainHash, GENESIS_HASH, type CommitEvidence } from '@attest/core';
+import { createChainHash, GENESIS_HASH } from '@attest/core';
 import { establishUser, randomToken, requireUser } from './auth.js';
 import assessmentRoutes, { gradeAssessment } from './assessments.js';
 import type { Bindings } from './types.js';
@@ -112,16 +112,20 @@ app.post('/api/cli/sync', requireUser, async (c) => {
   } catch {
     return c.json({ error: 'invalid_json' }, 400);
   }
-  if (!Array.isArray(body.evidence) || body.evidence.length === 0 || body.evidence.length > 100) {
-    return c.json({ error: 'evidence_must_contain_between_1_and_100_items' }, 400);
+  if (!Array.isArray(body.evidence) || body.evidence.length === 0 || body.evidence.length > 400) {
+    return c.json({ error: 'evidence_must_contain_between_1_and_400_items' }, 400);
   }
   const userId = c.get('user').id;
   const statements: D1PreparedStatement[] = [];
-  let previousHash = GENESIS_HASH;
+  const chains = new Map<string, Array<{ previous: string; hash: string }>>();
   const allowedNodeKeys = new Set(['id', 'claim_type', 'claim_value', 'source', 'status', 'confidence', 'captured_at', 'evidence_ref']);
-  const allowedReferenceKeys = new Set([
+  const gitReferenceKeys = new Set([
     'commit_hash', 'parent_hashes', 'committed_at', 'repository', 'repository_url', 'message', 'files', 'quote',
     'previous_hash', 'chain_hash',
+  ]);
+  const sessionReferenceKeys = new Set([
+    'session_id', 'format', 'event_id', 'event_type', 'actor', 'occurred_at', 'quote', 'verification_level',
+    'verification_reasons', 'previous_hash', 'chain_hash',
   ]);
   const exactKeys = (value: object, allowed: Set<string>, required: Set<string>): boolean => {
     const keys = Object.keys(value);
@@ -129,43 +133,94 @@ app.post('/api/cli/sync', requireUser, async (c) => {
   };
   for (const raw of body.evidence) {
     if (typeof raw !== 'object' || raw === null) return c.json({ error: 'invalid_evidence_node' }, 400);
-    const node = raw as Partial<CommitEvidence>;
-    const ref = node.evidence_ref;
-    if (
-      !exactKeys(node, allowedNodeKeys, allowedNodeKeys) || typeof node.id !== 'string' ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(node.id) ||
-      typeof node.claim_type !== 'string' || node.claim_type.length > 80 ||
-      typeof node.claim_value !== 'string' || node.claim_value.length > 1200 ||
-      typeof node.source !== 'string' || node.source !== 'git' || node.status !== 'Supported' ||
-      node.confidence !== null || !Number.isSafeInteger(node.captured_at) || !ref ||
-      !exactKeys(ref, allowedReferenceKeys, new Set(['commit_hash', 'parent_hashes', 'committed_at', 'repository', 'message', 'files', 'quote', 'previous_hash', 'chain_hash'])) ||
-      !/^[a-f0-9]{40,64}$/i.test(ref.commit_hash) || typeof ref.message !== 'string' ||
-      ref.message.length > 1000 || typeof ref.quote !== 'string' || ref.quote.length > 600 ||
-      typeof ref.repository !== 'string' || !/^[\w.-]{1,120}$/.test(ref.repository) ||
-      !Array.isArray(ref.parent_hashes) || ref.parent_hashes.length > 2 ||
-      !ref.parent_hashes.every((hash) => /^[a-f0-9]{40,64}$/i.test(hash)) ||
-      !Array.isArray(ref.files) || ref.files.length > 40 ||
-      !ref.files.every((file) => typeof file === 'string' && file.length <= 500) ||
-      !Number.isFinite(Date.parse(ref.committed_at)) ||
-      (ref.repository_url !== undefined && (typeof ref.repository_url !== 'string' ||
-        !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(ref.repository_url))) ||
-      ref.previous_hash !== previousHash || !/^[a-f0-9]{64}$/i.test(ref.chain_hash)
-    ) return c.json({ error: 'invalid_evidence_chain' }, 400);
-    const { chain_hash: suppliedHash, previous_hash: suppliedPrevious, ...reference } = ref;
-    const { evidence_ref: _evidenceRef, ...base } = node;
-    if (
-      typeof base.id !== 'string' || typeof base.claim_type !== 'string' || typeof base.claim_value !== 'string' ||
-      typeof base.source !== 'string' || base.status !== 'Supported' || base.confidence !== null ||
-      !Number.isSafeInteger(base.captured_at)
+    const node = raw as Record<string, unknown>;
+    const ref = node['evidence_ref'] as Record<string, unknown> | undefined;
+    if (!exactKeys(node, allowedNodeKeys, allowedNodeKeys) ||
+      typeof node['id'] !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(node['id']) ||
+      typeof node['claim_type'] !== 'string' || node['claim_type'].length > 80 ||
+      typeof node['claim_value'] !== 'string' || node['claim_value'].length > 1200 ||
+      !Number.isSafeInteger(node['captured_at']) || !ref ||
+      typeof node['source'] !== 'string' ||
+      typeof node['status'] !== 'string' ||
+      node['confidence'] !== null
     ) return c.json({ error: 'invalid_evidence_node' }, 400);
-    const expectedHash = await createChainHash(suppliedPrevious, base as Omit<CommitEvidence, 'evidence_ref'>, reference);
+
+    let streamKey: string;
+    if (node['source'] === 'git') {
+      if (node['status'] !== 'Supported' ||
+        !exactKeys(ref, gitReferenceKeys, new Set([
+          'commit_hash', 'parent_hashes', 'committed_at', 'repository', 'message', 'files', 'quote',
+          'previous_hash', 'chain_hash',
+        ])) ||
+        typeof ref['commit_hash'] !== 'string' || !/^[a-f0-9]{40,64}$/i.test(ref['commit_hash']) ||
+        typeof ref['message'] !== 'string' || ref['message'].length > 1000 ||
+        typeof ref['quote'] !== 'string' || ref['quote'].length > 600 ||
+        typeof ref['repository'] !== 'string' || !/^[\w.-]{1,120}$/.test(ref['repository']) ||
+        !Array.isArray(ref['parent_hashes']) || ref['parent_hashes'].length > 2 ||
+        !ref['parent_hashes'].every((hash) => typeof hash === 'string' && /^[a-f0-9]{40,64}$/i.test(hash)) ||
+        !Array.isArray(ref['files']) || ref['files'].length > 40 ||
+        !ref['files'].every((file) => typeof file === 'string' && file.length <= 500) ||
+        typeof ref['committed_at'] !== 'string' || !Number.isFinite(Date.parse(ref['committed_at'])) ||
+        (ref['repository_url'] !== undefined && (typeof ref['repository_url'] !== 'string' ||
+          !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(ref['repository_url'])))
+      ) return c.json({ error: 'invalid_evidence_chain' }, 400);
+      streamKey = 'git';
+    } else if (node['source'] === 'session') {
+      const sessionId = ref['session_id'];
+      if (node['status'] !== 'Unverified' ||
+        !exactKeys(ref, sessionReferenceKeys, sessionReferenceKeys) ||
+        typeof sessionId !== 'string' || sessionId.length > 160 ||
+        !['claude-code-jsonl', 'attest-session-log/1', 'vv-session-log/1'].includes(String(ref['format'])) ||
+        typeof ref['event_id'] !== 'string' || ref['event_id'].length > 240 ||
+        typeof ref['event_type'] !== 'string' || ref['event_type'].length > 40 ||
+        !['user', 'assistant', 'tool', 'system'].includes(String(ref['actor'])) ||
+        typeof ref['occurred_at'] !== 'string' || !Number.isFinite(Date.parse(ref['occurred_at'])) ||
+        typeof ref['quote'] !== 'string' || ref['quote'].length > 600 ||
+        !['L0', 'L1'].includes(String(ref['verification_level'])) ||
+        !Array.isArray(ref['verification_reasons']) || ref['verification_reasons'].length > 8 ||
+        !ref['verification_reasons'].every((reason) => typeof reason === 'string' && reason.length <= 120)
+      ) return c.json({ error: 'invalid_evidence_chain' }, 400);
+      streamKey = `session:${sessionId}`;
+    } else {
+      return c.json({ error: 'invalid_evidence_node' }, 400);
+    }
+
+    if (typeof ref['previous_hash'] !== 'string' || typeof ref['chain_hash'] !== 'string' ||
+      !/^[a-f0-9]{64}$/i.test(ref['previous_hash']) ||
+      !/^[a-f0-9]{64}$/i.test(ref['chain_hash'])) {
+      return c.json({ error: 'invalid_evidence_chain' }, 400);
+    }
+    const { chain_hash: suppliedHash, previous_hash: suppliedPrevious, ...reference } = ref;
+    const base = {
+      id: node['id'],
+      claim_type: node['claim_type'],
+      claim_value: node['claim_value'],
+      source: node['source'],
+      status: node['status'],
+      confidence: node['confidence'],
+      captured_at: node['captured_at'],
+    };
+    const expectedHash = await createChainHash(String(suppliedPrevious), base, reference);
     if (expectedHash !== suppliedHash) return c.json({ error: 'evidence_chain_hash_mismatch' }, 400);
-    previousHash = suppliedHash;
+    const chain = chains.get(streamKey) ?? [];
+    chain.push({ previous: String(suppliedPrevious), hash: String(suppliedHash) });
+    chains.set(streamKey, chain);
     statements.push(c.env.DB.prepare(
       `INSERT INTO evidence_nodes (id, user_id, claim_type, claim_value, source, status, confidence, evidence_ref, captured_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO NOTHING`,
     ).bind(node.id, userId, node.claim_type, node.claim_value, node.source, node.status, null, JSON.stringify(ref), node.captured_at));
+  }
+  for (const chain of chains.values()) {
+    let previous = GENESIS_HASH;
+    const remaining = [...chain];
+    while (remaining.length > 0) {
+      const links = remaining.filter((entry) => entry.previous === previous);
+      if (links.length !== 1) return c.json({ error: 'invalid_evidence_chain' }, 400);
+      previous = links[0].hash;
+      remaining.splice(remaining.indexOf(links[0]), 1);
+    }
   }
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM evidence_nodes WHERE user_id = ?').bind(userId),
