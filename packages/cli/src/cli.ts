@@ -8,7 +8,7 @@ import type { SyncPayload } from '@attest/core';
 
 const program = new Command();
 program.name('attest').description('Create and share evidence-backed developer credentials.').version('0.1.0');
-program.option('--api <url>', 'Attest API URL', process.env['ATTEST_API_URL'] ?? '');
+program.option('--api <url>', 'Attest API URL', process.env['ATTEST_API_URL'] ?? 'https://attest-api.emmanuelnwachi2457.workers.dev');
 
 async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
@@ -53,7 +53,6 @@ async function login(apiUrl: string): Promise<void> {
 
 program.command('login').description('Sign in with GitHub using a device code.').action(async () => {
   const apiUrl = program.opts<{ api: string }>().api;
-  if (!apiUrl) throw new Error('Set ATTEST_API_URL or pass --api <url> to choose the Attest Worker.');
   await login(apiUrl);
 });
 
@@ -94,7 +93,7 @@ program.command('sync').description('Preview and upload reviewed git evidence af
   const result = await responseJson<{ synced?: number; error?: string }>(response)
     .catch((): { synced?: number; error?: string } => ({}));
   if (!response.ok) throw new Error(`Upload failed: ${result.error ?? `HTTP ${response.status}`}.`);
-  console.log(`Uploaded ${result.synced ?? 0} evidence items. Profile: https://attest.sh/v/${config.handle}`);
+  console.log(`Uploaded ${result.synced ?? 0} evidence items. Profile: ${config.apiUrl}/v/${encodeURIComponent(config.handle ?? '')}`);
 });
 
 program.command('wipe').description('Permanently delete your uploaded evidence and assessments.').action(async () => {
