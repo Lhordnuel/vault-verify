@@ -61,6 +61,9 @@ button { font: inherit; }
 .profile-hero .eyebrow { margin: 0; }
 .profile-actions { margin-left: auto; display: flex; align-items: flex-end; flex-direction: column; gap: 8px; }
 .profile-actions > span, .submit-row > span { color: var(--muted); font-size: 11px; }
+.profile-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.export-hint { max-width: 290px; text-align: right; }
+.print-heading, .print-disclaimer { display: none; }
 .button { border: 0; border-radius: 7px; padding: 12px 16px; cursor: pointer; font-size: 12px; font-weight: 650; }
 .button.primary { color: #0c1710; background: var(--green); }
 .button.primary:disabled { opacity: .48; cursor: not-allowed; }
@@ -146,4 +149,28 @@ button { font: inherit; }
   .quick-start { flex-direction: column; }
   .page-shell { padding-left: 18px; padding-right: 18px; }
   .submit-row { align-items: flex-start; flex-direction: column; gap: 13px; }
+}
+
+@media print {
+  @page { size: A4; margin: 15mm; }
+  :root { color: #172019; background: #fff; }
+  body { min-width: 0; color: #172019; background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .page-shell { max-width: none; padding: 0; }
+  .page-nav .brand { color: #172019; }
+  .page-nav .nav-link, .profile-actions, .owner-tools, .action-notice, .error, .chain-details, .profile-footer { display: none !important; }
+  .profile-hero { padding: 22px 0; border-bottom: 1px solid #d5ddd7; }
+  .profile-hero h1 { color: #172019; }
+  .print-heading { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 2px solid #375d43; color: #375d43; font-size: 9pt; font-weight: 700; letter-spacing: 1.4px; }
+  .print-disclaimer { display: block; margin-top: 24px; padding-top: 10px; border-top: 1px solid #d5ddd7; color: #536057; font-size: 9pt; line-height: 1.5; }
+  .notice { margin-top: 14px; border-color: #d5ddd7; color: #3b473e; background: #f5f8f5; }
+  .evidence-section, .grade-card { margin-top: 24px; }
+  .section-title { border-color: #d5ddd7; }
+  .section-title h2, .section-title > span, .section-title small { color: #263b2c; }
+  .claim-list { grid-template-columns: 1fr 1fr; gap: 9px; }
+  .claim-card, .grade-card, .grade-pass { break-inside: avoid; border-color: #d5ddd7; color: #172019; background: #fff; }
+  .claim-type, .status, .claim-card h3, .evidence-quote, .evidence-meta, .commit-link, .agreement-line, .pass-label, .grade-pass > p, .competency, .competency b, .competency blockquote { color: #263b2c; }
+  .evidence-quote { border-color: #5b8d69; background: #f2f7f3; }
+  .grade-passes { grid-template-columns: 1fr 1fr; }
+  .grade-pass { border-color: #d5ddd7; }
+  a { color: #275b37; text-decoration: underline; }
 }

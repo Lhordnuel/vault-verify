@@ -22,7 +22,7 @@ app.get('/api/health', (c) => c.json({
   readiness: {
     github: Boolean(c.env.GH_CLIENT_ID && c.env.GH_CLIENT_SECRET),
     session: Boolean(c.env.SESSION_SECRET),
-    meta_ai: Boolean(c.env.META_LLAMA_API_KEY),
+    meta_ai: Boolean(c.env.META_API_KEY || c.env.META_LLAMA_API_KEY),
   },
 }));
 
