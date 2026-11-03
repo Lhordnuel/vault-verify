@@ -38,7 +38,7 @@ Open `http://localhost:5173`. From the Attest source repository, the CLI command
 .\attest.cmd wipe
 ```
 
-The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. Invoke it by full path from another git repository while keeping that repository as the current directory; the scanner uses the current directory. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
+The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. It defaults to the live Attest Worker; override it with `ATTEST_API_URL` or `--api`. Invoke the launcher by full path from another git repository while keeping that repository as the current directory; the scanner uses the current directory. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
 
 `scan` writes only to `.attest/scan.json`; it does not upload. `sync` prints the complete JSON request, explains that it replaces the previous evidence snapshot, asks for confirmation, and only then uploads it. `wipe` requires a separate confirmation and deletes that account's uploaded evidence, assessments, and R2 artifacts.
 

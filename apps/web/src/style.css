@@ -64,8 +64,26 @@ button { font: inherit; }
 .button { border: 0; border-radius: 7px; padding: 12px 16px; cursor: pointer; font-size: 12px; font-weight: 650; }
 .button.primary { color: #0c1710; background: var(--green); }
 .button.primary:disabled { opacity: .48; cursor: not-allowed; }
+.button.secondary { border: 1px solid #405045; background: #1b241d; color: #d3ddd4; }
+.button.secondary:hover { border-color: #698274; background: #202c23; }
+.button.danger { border: 1px solid #714740; background: #2a1b19; color: #ffb0a5; }
+.button.danger:hover { background: #3a211e; }
+.button:disabled { opacity: .55; cursor: not-allowed; }
 .notice { border: 1px solid #344139; background: #171e19; padding: 14px 16px; border-radius: 7px; color: #a9b5ab; font-size: 12px; }
 .notice span { color: var(--green); margin-right: 8px; }
+.owner-tools { margin-top: 20px; padding: 19px; border: 1px solid #344139; border-radius: 9px; background: #141a15; }
+.owner-tool-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.owner-tool-heading .eyebrow { margin: 0 0 6px; }
+.owner-tool-heading h2 { margin: 0; font-size: 17px; font-weight: 560; }
+.owner-tool-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.owner-tool-copy, .cli-instructions > p { color: #a9b5ab; font-size: 12px; line-height: 1.65; }
+.cli-instructions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); color: #c5d0c7; font-size: 12px; }
+.cli-instructions summary { cursor: pointer; color: var(--green); }
+.cli-instructions ol { padding-left: 20px; line-height: 1.8; }
+.cli-instructions pre { overflow: auto; padding: 14px; border: 1px solid #2c382f; border-radius: 7px; background: #0f130f; color: #d4dfd6; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cli-instructions p code, .cli-instructions li code { color: #d5e0d7; }
+.owner-danger-zone { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 18px; padding-top: 15px; border-top: 1px solid #382b28; color: #9caaa0; font-size: 11px; }
+.action-notice { color: var(--green); font-size: 12px; }
 .evidence-section, .grade-card { margin-top: 39px; }
 .section-title { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .section-title > span { color: var(--green); font-size: 10px; }
@@ -121,6 +139,8 @@ button { font: inherit; }
   .hero { padding: 78px 0 90px; }
   .profile-hero { flex-wrap: wrap; }
   .profile-actions { width: 100%; align-items: flex-start; margin: 5px 0 0; }
+  .owner-tool-heading { flex-direction: column; }
+  .owner-danger-zone { align-items: flex-start; flex-direction: column; }
   .claim-list, .grade-passes { grid-template-columns: 1fr; }
   .landing-footer { gap: 18px; flex-wrap: wrap; }
   .quick-start { flex-direction: column; }

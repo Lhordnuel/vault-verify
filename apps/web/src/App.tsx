@@ -45,6 +45,7 @@ type Profile = {
   assessments: Array<{ id: string; status: string; ai_grade: Grade | null; grader_agreement: number | null; human_review_required: number }>;
   signal_summary: string;
 };
+type UserSession = { handle: string; username: string };
 type Test = { id: string; test_prompt: string; starter_code: string; rubric_instance: { criteria: Array<{ skill: string; weight: number; description: string }> } };
 
 function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -144,11 +145,29 @@ function GradeCard({ grade }: { grade: Grade }) {
 function ProfilePage({ handle }: { handle: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
+  const [session, setSession] = useState<UserSession | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const isOwner = session?.handle === profile?.handle;
+  const loadProfile = async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const next = await api<Profile>(`/api/evidence/${encodeURIComponent(handle)}`);
+      setProfile(next);
+      setNotice('Evidence profile refreshed.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load evidence profile');
+    } finally {
+      setRefreshing(false);
+    }
+  };
   useEffect(() => {
+    setNotice('');
+    setError('');
     api<Profile>(`/api/evidence/${encodeURIComponent(handle)}`).then(setProfile).catch((err: Error) => setError(err.message));
-    api<{ handle: string }>('/api/cli/me').then(() => setSignedIn(true)).catch(() => setSignedIn(false));
+    api<UserSession>('/api/cli/me').then(setSession).catch(() => setSession(null));
   }, [handle]);
   const latestGrade = profile?.assessments.find((assessment) => assessment.ai_grade)?.ai_grade;
   const startAssessment = async () => {
@@ -161,17 +180,79 @@ function ProfilePage({ handle }: { handle: string }) {
       setBusy(false);
     }
   };
+  const copyText = async (value: string, success: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setNotice(success);
+    } catch {
+      setNotice('Clipboard access is unavailable. Select and copy the text below.');
+    }
+  };
+  const wipeEvidence = async () => {
+    if (!window.confirm('Permanently delete all uploaded evidence, assessments, and stored artifacts for this account? This cannot be undone.')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api<{ deleted: boolean }>('/api/cli/wipe', { method: 'DELETE' });
+      await loadProfile();
+      setNotice('Your uploaded evidence and assessments were deleted.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete your evidence');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const profileUrl = window.location.href;
+  const apiUrl = window.location.origin;
+  const commandSnippet = [
+    `$env:ATTEST_API_URL = '${apiUrl}'`,
+    '# Run these from the git repository you want to scan:',
+    '& "$env:ATTEST_HOME\\attest.cmd" login',
+    '& "$env:ATTEST_HOME\\attest.cmd" scan',
+    '& "$env:ATTEST_HOME\\attest.cmd" sync',
+  ].join('\n');
+  const cliSetupSnippet = [
+    'git clone https://github.com/Lhordnuel/vault-verify.git attest',
+    'Set-Location attest',
+    'npm.cmd install',
+    'npm.cmd run build -w @attest/core',
+    'npm.cmd run build -w @attest/cli',
+    '$env:ATTEST_HOME = (Get-Location).Path',
+    "$env:ATTEST_REPO = 'C:\\path\\to\\your\\git\\repository'",
+    'Set-Location $env:ATTEST_REPO',
+    commandSnippet,
+  ].join('\n');
   if (error && !profile) return <main className="page-shell"><p className="error">{error}</p></main>;
   if (!profile) return <main className="page-shell"><p className="muted">Loading evidence…</p></main>;
   return <main className="page-shell">
     <header className="page-nav"><a className="brand" href="/"><span className="brand-mark">A</span> attest<span className="brand-dot">.</span></a>
-      {signedIn ? <span className="nav-link">{profile.github_username}</span> : <a className="nav-link" href="/api/auth/github">Sign in with GitHub</a>}</header>
+      {session ? <span className="nav-link">{session.username}</span> : <a className="nav-link" href="/api/auth/github">Sign in with GitHub</a>}</header>
     <section className="profile-hero">
       <div className="avatar">{profile.handle.slice(0, 1).toUpperCase()}</div>
       <div><p className="eyebrow">EVIDENCE PROFILE</p><h1>{profile.handle}<span className="muted"> /</span></h1><a className="github-link" href={`https://github.com/${encodeURIComponent(profile.github_username)}`} target="_blank" rel="noreferrer">@{profile.github_username} ↗</a></div>
-      <div className="profile-actions"><button className="button primary" disabled={!signedIn || busy} onClick={startAssessment}>{busy ? 'Preparing…' : 'Take an evidence-based test'}</button><span>Scores only appear with cited evidence.</span></div>
+      <div className="profile-actions"><button className="button primary" disabled={!isOwner || !profile.claims.length || busy} onClick={startAssessment}>{busy ? 'Preparing…' : 'Take an evidence-based test'}</button><span>{!isOwner ? 'Sign in as the profile owner to start an assessment.' : !profile.claims.length ? 'Sync reviewed evidence before generating a test.' : 'Scores only appear with cited evidence.'}</span></div>
     </section>
     <div className="notice"><span>◎</span> Attest means these specific claims have supporting evidence — not that a person is good. Git history is a source citation, not independent proof of authorship.</div>
+    {isOwner && <section className="owner-tools">
+      <div className="owner-tool-heading"><div><p className="eyebrow">YOUR ATTEST ACCOUNT</p><h2>Get your evidence on this profile</h2></div>
+        <div className="owner-tool-actions">
+          <button className="button secondary" onClick={() => void loadProfile()} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh evidence'}</button>
+          <button className="button secondary" onClick={() => void copyText(profileUrl, 'Profile link copied.')}>Copy profile link</button>
+        </div>
+      </div>
+      {!profile.claims.length && <p className="owner-tool-copy">Attest never reads your local repository from this page. Use the CLI in the repository you want to share; scanning stays local until you review the preview and confirm sync.</p>}
+      <details className="cli-instructions" open={!profile.claims.length}>
+        <summary>{profile.claims.length ? 'CLI setup and sync instructions' : 'Connect a git repository with the CLI'}</summary>
+        <ol>
+          <li>Clone the Attest source and build the CLI once. Then change the <code>ATTEST_REPO</code> example path to your local git repository.</li>
+          <li>Run the copied commands. Scan previews locally; sync uploads only after you confirm.</li>
+        </ol>
+        <pre><code>{cliSetupSnippet}</code></pre>
+        <button className="button secondary" onClick={() => void copyText(cliSetupSnippet, 'CLI setup and sync commands copied.')}>Copy CLI setup and sync</button>
+        <p>Review the scan output before <code>sync</code>; the CLI asks for confirmation before any upload. Your public profile updates when you press Refresh evidence.</p>
+      </details>
+      <div className="owner-danger-zone"><span>Privacy control</span><button className="button danger" onClick={() => void wipeEvidence()} disabled={busy}>{busy ? 'Working…' : 'Delete all uploaded evidence'}</button></div>
+    </section>}
     <section className="evidence-section">
       <div className="section-title"><span>01</span><h2>Claims &amp; evidence</h2><small>{profile.claims.length} RECORDS</small></div>
       {!profile.claims.length ? <div className="empty-state"><p>{profile.signal_summary}</p><small>Evidence appears here only after its owner reviews and syncs it.</small></div> :
@@ -185,7 +266,8 @@ function ProfilePage({ handle }: { handle: string }) {
         </article>)}</div>}
     </section>
     {latestGrade && <GradeCard grade={latestGrade} />}
-    {error && <p className="error inline-error">{error}</p>}
+    {error && <p className="error inline-error" role="alert">{error}</p>}
+    {notice && <p className="action-notice" role="status">{notice}</p>}
     <footer className="profile-footer">Evidence can be reviewed and revoked by its owner. Missing evidence is unverified, never guessed.</footer>
   </main>;
 }
