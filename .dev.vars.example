@@ -1,0 +1,4 @@
+GH_CLIENT_ID=replace-with-github-oauth-client-id
+GH_CLIENT_SECRET=replace-with-github-oauth-client-secret
+SESSION_SECRET=replace-with-a-long-random-secret
+META_LLAMA_API_KEY=replace-with-meta-llama-api-key

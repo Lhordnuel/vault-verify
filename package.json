@@ -1,1 +1,27 @@
-{"description":"Tamper-evident evidence ledger for assessing how candidates work with AI coding agents.","devDependencies":{"@testing-library/react":"^16.0.0","husky":"^9.0.0","jsdom":"^25.0.0","vitest":"^3.0.0"},"engines":{"node":">=20"},"name":"vault-verify","private":true,"scripts":{"build":"npm run build -w @vault-verify/core && npm run build -w @vault-verify/harness && npm run build -w @vault-verify/scoring","check:secrets":"node scripts/check-secrets.mjs","prepare":"husky","test":"npm run build -w @vault-verify/core && vitest run","typecheck":"npm run build -w @vault-verify/core && npm run typecheck --workspaces --if-present && npm run typecheck:functions","typecheck:functions":"tsc -p supabase/functions/session --noEmit"},"version":"0.2.0","workspaces":["packages/*","apps/*"],"allowScripts":{"esbuild@0.28.2":true}}
+{
+  "name": "attest-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable, evidence-backed developer credentials.",
+  "engines": { "node": ">=20" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w @attest/web",
+    "dev:api": "npm run dev -w @attest/api",
+    "build": "npm run build -w @attest/core && npm run build -w @attest/cli && npm run build -w @attest/api",
+    "typecheck": "npm run build -w @attest/core && npm run typecheck -w @attest/cli && npm run typecheck -w @attest/api && npm run typecheck -w @attest/web",
+    "test": "vitest run",
+    "check:secrets": "node scripts/check-secrets.mjs"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0"
+  }
+}

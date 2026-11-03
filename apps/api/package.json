@@ -1,0 +1,23 @@
+{
+  "name": "@attest/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --var APP_ORIGIN:http://127.0.0.1:5173",
+    "db:local": "wrangler d1 execute attest-db --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute attest-db --remote --file=./schema.sql",
+    "build": "npm run build -w @attest/web && wrangler deploy --dry-run --outdir=dist",
+    "deploy": "npm run build -w @attest/web && wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@attest/core": "0.1.0",
+    "hono": "^4.7.0",
+    "workers-og": "^0.0.27"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250401.0",
+    "wrangler": "^4.0.0"
+  }
+}
