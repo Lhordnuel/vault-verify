@@ -33,12 +33,12 @@ Open `http://localhost:5173`. From the Attest source repository, the CLI command
 
 ```sh
 .\attest.cmd login
-.\attest.cmd scan
-.\attest.cmd sync
+.\attest.cmd scan "C:\path\to\folder\containing\repositories"
+.\attest.cmd sync "C:\path\to\folder\containing\repositories"
 .\attest.cmd wipe
 ```
 
-The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. It defaults to the live Attest Worker; override it with `ATTEST_API_URL` or `--api`. Invoke the launcher by full path from another git repository while keeping that repository as the current directory; the scanner uses the current directory. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
+The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. It defaults to `https://attests.vaultio.tech`; override it with `ATTEST_API_URL` or `--api`. Choose a parent folder containing the git repositories you want to scan. Attest discovers repositories recursively (including nested repositories), skips common generated folders, and caps each combined preview at 100 commits. The `.attest/scan.json` preview is saved in that parent folder. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
 
 `scan` writes only to `.attest/scan.json`; it does not upload. `sync` prints the complete JSON request, explains that it replaces the previous evidence snapshot, asks for confirmation, and only then uploads it. `wipe` requires a separate confirmation and deletes that account's uploaded evidence, assessments, and R2 artifacts.
 
@@ -50,7 +50,7 @@ The Worker config is `apps/api/wrangler.toml`; D1 schema and the initial rubric 
 npx.cmd wrangler r2 bucket create attest-artifacts
 ```
 
-The D1 ID is already configured. Apply the schema and create the bucket before deploying. The Worker serves the built Vite app and API from one `workers.dev` origin; a separate Pages project and unconfigured `attest.sh` DNS route are not required for the demo.
+The D1 ID is already configured. Apply the schema and create the bucket before deploying. The Worker serves the built Vite app and API; the demo is available at `https://attests.vaultio.tech` and the existing `workers.dev` origin.
 
 ```sh
 npm.cmd run db:remote -w @attest/api
@@ -64,7 +64,7 @@ npx.cmd wrangler secret put META_API_KEY
 
 Use your GitHub OAuth App credentials, a random `SESSION_SECRET`, and a Meta Model API key. Enter secrets only into Wrangler's secure prompt; never commit them. The Worker accepts `META_API_KEY` (and temporarily supports the previous `META_LLAMA_API_KEY` binding). Tests are generated with Muse Spark 1.3 and independently graded by Muse Spark 1.3 and Muse Wonder 1.0 via `https://api.meta.ai/v1/chat/completions`.
 
-Deploy the complete app (API plus static assets) with `npm.cmd run deploy -w @attest/api`. Register the GitHub OAuth callback as `<workers.dev URL>/api/auth/github/callback`, set `ATTEST_API_URL` to that URL in the terminal for CLI use, then test `login`, `scan`, `sync`, and `wipe`.
+Deploy the complete app (API plus static assets) with `npm.cmd run deploy -w @attest/api`. In the GitHub OAuth App settings, register `https://attests.vaultio.tech/api/auth/github/callback` as the callback URL. The callback is derived from the hostname used to start sign-in. The CLI defaults to the custom domain; then test `login`, `scan`, `sync`, and `wipe`.
 
 Publishing the CLI to npm still requires an available owned package scope and npm login. Until then use the Windows `.cmd` launcher rather than `npx attest`.
 

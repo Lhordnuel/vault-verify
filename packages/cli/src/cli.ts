@@ -3,12 +3,12 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Command } from 'commander';
-import { loadScan, readConfig, saveScan, scanRepository, writeConfig } from './evidence.js';
+import { loadScan, readConfig, saveScan, scanRepositories, writeConfig } from './evidence.js';
 import type { SyncPayload } from '@attest/core';
 
 const program = new Command();
 program.name('attest').description('Create and share evidence-backed developer credentials.').version('0.1.0');
-program.option('--api <url>', 'Attest API URL', process.env['ATTEST_API_URL'] ?? 'https://attest-api.emmanuelnwachi2457.workers.dev');
+program.option('--api <url>', 'Attest API URL', process.env['ATTEST_API_URL'] ?? 'https://attests.vaultio.tech');
 
 async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
@@ -56,26 +56,35 @@ program.command('login').description('Sign in with GitHub using a device code.')
   await login(apiUrl);
 });
 
-program.command('scan').description('Scan local git history and save a private evidence preview.').option('--limit <n>', 'maximum commits', '100').action(async (options: { limit: string }) => {
-  const cwd = process.cwd();
-  const payload = await scanRepository(cwd, Number.parseInt(options.limit, 10));
-  await saveScan(cwd, payload);
-  console.log(`Scanned ${payload.evidence.length} commits. Evidence is local only; nothing was uploaded.`);
-  console.log(`Preview saved to ${cwd}\\.attest\\scan.json. Review it before running attest sync.`);
-  for (const item of payload.evidence) {
-    console.log(`\n${item.evidence_ref.commit_hash.slice(0, 10)}  ${item.claim_type}  ${item.claim_value}`);
-    console.log(`  Evidence: ${item.evidence_ref.quote.replace(/\n/g, '\n  ')}`);
-  }
-});
+program.command('scan')
+  .description('Scan git repositories under a chosen folder and save a private combined preview.')
+  .argument('[folder]', 'parent folder to search; defaults to the current folder')
+  .option('--limit <n>', 'maximum commits across all discovered repositories', '100')
+  .action(async (folder: string | undefined, options: { limit: string }) => {
+    const root = folder ?? process.cwd();
+    const { payload, repositories, skippedEmpty } = await scanRepositories(root, Number.parseInt(options.limit, 10));
+    await saveScan(root, payload);
+    console.log(`Scanned ${payload.evidence.length} commits across ${repositories.length} repositories. Evidence is local only; nothing was uploaded.`);
+    if (skippedEmpty) console.log(`Skipped ${skippedEmpty} empty repositories.`);
+    console.log(`Repositories: ${repositories.map((repository) => repository.split(/[\\/]/).pop()).join(', ')}`);
+    console.log(`Preview saved to ${root}\\.attest\\scan.json. Review it before running attest sync "${root}".`);
+    for (const item of payload.evidence) {
+      console.log(`\n${item.evidence_ref.repository} · ${item.evidence_ref.commit_hash.slice(0, 10)}  ${item.claim_type}  ${item.claim_value}`);
+      console.log(`  Evidence: ${item.evidence_ref.quote.replace(/\n/g, '\n  ')}`);
+    }
+  });
 
-program.command('sync').description('Preview and upload reviewed git evidence after confirmation.').action(async () => {
+program.command('sync')
+  .description('Preview and upload reviewed git evidence after confirmation.')
+  .argument('[folder]', 'folder containing the saved scan; defaults to the current folder')
+  .action(async (folder?: string) => {
   const opts = program.opts<{ api: string }>();
   const config = await readConfig(opts.api);
   if (!config.token) throw new Error('Not signed in. Run `attest login` first.');
-  const scanned = await loadScan(process.cwd());
+  const scanned = await loadScan(folder ?? process.cwd());
   const payload: SyncPayload = { ...scanned, handle: config.handle ?? '' };
   const exactRequest = JSON.stringify({ evidence: payload.evidence }, null, 2);
-  console.log('Sync replaces your uploaded evidence snapshot with these records (up to 100 recent commits).');
+  console.log('Sync replaces your uploaded evidence snapshot with these records (up to 100 recent commits across scanned repositories).');
   console.log('The following JSON is exactly what will be sent to Attest:');
   console.log(exactRequest);
   const rl = createInterface({ input: stdin, output: stdout });

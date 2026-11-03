@@ -76,7 +76,7 @@ function Landing() {
     }
     try {
       await Promise.race([
-        navigator.clipboard.writeText('.\\attest.cmd scan'),
+        navigator.clipboard.writeText('.\\attest.cmd scan "C:\\path\\to\\repositories"'),
         new Promise<never>((_, reject) => {
           window.setTimeout(() => reject(new Error('Clipboard access timed out.')), 800);
         }),
@@ -104,16 +104,16 @@ function Landing() {
         <div className="command-card">
           <span className="terminal-prompt" aria-hidden="true">$</span>
           {copyFallback
-            ? <input ref={commandInput} className="command-copy-input" aria-label="Select and copy CLI command" value=".\attest.cmd scan" readOnly />
-            : <code>.\attest.cmd scan</code>}
+            ? <input ref={commandInput} className="command-copy-input" aria-label="Select and copy CLI command" value={'.\\attest.cmd scan "C:\\path\\to\\repositories"'} readOnly />
+            : <code>{'.\\attest.cmd scan "C:\\path\\to\\repositories"'}</code>}
           <button className="copy-command" onClick={copyCommand} aria-label="Copy Windows CLI command">
             {copied ? 'Copied ✓' : copyFallback ? 'Select command' : 'Copy command'}
           </button>
         </div>
         <div className="quick-start">
           <span><b>01</b> Sign in <code>.\attest.cmd login</code></span>
-          <span><b>02</b> Review <code>.\attest.cmd scan</code></span>
-          <span><b>03</b> Confirm <code>.\attest.cmd sync</code></span>
+          <span><b>02</b> Review <code>.\attest.cmd scan "C:\repos"</code></span>
+          <span><b>03</b> Confirm <code>.\attest.cmd sync "C:\repos"</code></span>
         </div>
         {copyFallback && <p className="copy-fallback" role="status">Clipboard access is unavailable. The command is selected—press Ctrl+C to copy.</p>}
         <span className="sr-only" aria-live="polite">{copied ? 'Command copied to clipboard.' : ''}</span>
@@ -231,12 +231,28 @@ function ProfilePage({ handle }: { handle: string }) {
   };
   const profileUrl = window.location.href;
   const apiUrl = window.location.origin;
+  const report = useMemo(() => {
+    const claims = profile?.claims ?? [];
+    const repositories = [...new Set(claims.map((claim) => claim.evidence_ref.repository))].sort();
+    const categories = [...claims.reduce((counts, claim) => {
+      counts.set(claim.claim_type, (counts.get(claim.claim_type) ?? 0) + 1);
+      return counts;
+    }, new Map<string, number>())].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+    const dates = claims.map((claim) => Date.parse(claim.evidence_ref.committed_at)).filter(Number.isFinite);
+    return {
+      repositories,
+      categories,
+      firstDate: dates.length ? new Date(Math.min(...dates)).toLocaleDateString() : 'Not available',
+      lastDate: dates.length ? new Date(Math.max(...dates)).toLocaleDateString() : 'Not available',
+    };
+  }, [profile?.claims]);
   const commandSnippet = [
     `$env:ATTEST_API_URL = '${apiUrl}'`,
-    '# Run these from the git repository you want to scan:',
+    '# Choose the folder containing the repositories you want to include:',
+    "$env:ATTEST_REPO = 'C:\\path\\to\\folder\\containing\\repositories'",
     '& "$env:ATTEST_HOME\\attest.cmd" login',
-    '& "$env:ATTEST_HOME\\attest.cmd" scan',
-    '& "$env:ATTEST_HOME\\attest.cmd" sync',
+    '& "$env:ATTEST_HOME\\attest.cmd" scan "$env:ATTEST_REPO"',
+    '& "$env:ATTEST_HOME\\attest.cmd" sync "$env:ATTEST_REPO"',
   ].join('\n');
   const cliSetupSnippet = [
     'git clone https://github.com/Lhordnuel/vault-verify.git attest',
@@ -245,8 +261,7 @@ function ProfilePage({ handle }: { handle: string }) {
     'npm.cmd run build -w @attest/core',
     'npm.cmd run build -w @attest/cli',
     '$env:ATTEST_HOME = (Get-Location).Path',
-    "$env:ATTEST_REPO = 'C:\\path\\to\\your\\git\\repository'",
-    'Set-Location $env:ATTEST_REPO',
+    "$env:ATTEST_REPO = 'C:\\path\\to\\folder\\containing\\repositories'",
     commandSnippet,
   ].join('\n');
   if (error && !profile) return <main className="page-shell"><p className="error">{error}</p></main>;
@@ -280,8 +295,8 @@ function ProfilePage({ handle }: { handle: string }) {
       <details className="cli-instructions" open={!profile.claims.length}>
         <summary>{profile.claims.length ? 'CLI setup and sync instructions' : 'Connect a git repository with the CLI'}</summary>
         <ol>
-          <li>Clone the Attest source and build the CLI once. Then change the <code>ATTEST_REPO</code> example path to your local git repository.</li>
-          <li>Run the copied commands. Scan previews locally; sync uploads only after you confirm.</li>
+          <li>Clone the Attest source and build the CLI once. Set <code>ATTEST_REPO</code> to a folder containing all the repositories you want to scan.</li>
+          <li>Run the copied commands. Attest finds git repositories under that folder, previews up to 100 commits, and sync uploads only after you confirm.</li>
         </ol>
         <pre><code>{cliSetupSnippet}</code></pre>
         <button className="button secondary" onClick={() => void copyText(cliSetupSnippet, 'CLI setup and sync commands copied.')}>Copy CLI setup and sync</button>
@@ -289,8 +304,25 @@ function ProfilePage({ handle }: { handle: string }) {
       </details>
       <div className="owner-danger-zone"><span>Privacy control</span><button className="button danger" onClick={() => void wipeEvidence()} disabled={busy}>{busy ? 'Working…' : 'Delete all uploaded evidence'}</button></div>
     </section>}
+    <section className="candidate-report">
+      <div className="section-title"><span>01</span><h2>Candidate evidence report</h2><small>PREPARED {new Date().toLocaleDateString()}</small></div>
+      <p className="report-summary">
+        This report summarizes {profile.claims.length} evidence {profile.claims.length === 1 ? 'record' : 'records'}
+        {' '}across {report.repositories.length} {report.repositories.length === 1 ? 'repository' : 'repositories'}.
+        {' '}Entries are sourced from the candidate-shared Git history; that history does not independently establish authorship or successful outcomes.
+      </p>
+      <div className="report-facts">
+        <div><span>EVIDENCE RECORDS</span><strong>{profile.claims.length}</strong></div>
+        <div><span>REPOSITORIES</span><strong>{report.repositories.length}</strong></div>
+        <div><span>HISTORY RANGE</span><strong>{profile.claims.length ? `${report.firstDate} – ${report.lastDate}` : 'Not available'}</strong></div>
+      </div>
+      {report.repositories.length > 0 && <p className="report-repositories"><b>Repositories:</b> {report.repositories.join(', ')}</p>}
+      {report.categories.length > 0 && <div className="report-categories"><h3>Work areas represented in the evidence</h3>
+        <div>{report.categories.map(([category, count]) => <span key={category}>{category.replace(/-/g, ' ')} <b>{count}</b></span>)}</div>
+      </div>}
+    </section>
     <section className="evidence-section">
-      <div className="section-title"><span>01</span><h2>Claims &amp; evidence</h2><small>{profile.claims.length} RECORDS</small></div>
+      <div className="section-title"><span>02</span><h2>Evidence register</h2><small>{profile.claims.length} RECORDS</small></div>
       {!profile.claims.length ? <div className="empty-state"><p>{profile.signal_summary}</p><small>Evidence appears here only after its owner reviews and syncs it.</small></div> :
         <div className="claim-list">{profile.claims.map((claim) => <article className="claim-card" key={claim.id}>
           <div className="claim-heading"><span className="claim-type">{claim.claim_type.replace(/-/g, ' ')}</span><span className="status supported">{claim.status}</span></div>

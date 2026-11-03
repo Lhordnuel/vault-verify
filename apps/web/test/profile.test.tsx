@@ -80,6 +80,24 @@ describe('evidence profile dashboard', () => {
     expect(print).toHaveBeenCalledOnce();
   });
 
+  it('renders a cited candidate report summary from the shared evidence', async () => {
+    window.history.pushState({}, '', '/v/dev');
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/api/evidence/')) return jsonResponse(profileWithEvidence);
+      if (url.endsWith('/api/cli/me')) return jsonResponse({ error: 'authentication_required' }, 401);
+      return jsonResponse({ error: 'not_found' }, 404);
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Candidate evidence report' })).toBeTruthy();
+    expect(screen.getByText('EVIDENCE RECORDS')).toBeTruthy();
+    expect(screen.getAllByText(/api design/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Evidence register' })).toBeTruthy();
+    expect(screen.getByText(/does not independently establish authorship or successful outcomes/)).toBeTruthy();
+  });
+
   it('shows the Meta provider error when evidence-based test generation fails', async () => {
     window.history.pushState({}, '', '/v/dev');
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {

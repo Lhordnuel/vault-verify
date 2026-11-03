@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { simpleGit } from 'simple-git';
@@ -12,6 +12,11 @@ import {
 
 const MAX_COMMITS = 100;
 const MAX_EVIDENCE = 200;
+const MAX_REPOSITORIES = 500;
+const IGNORED_DIRECTORY_NAMES = new Set([
+  '.git', 'node_modules', 'dist', 'build', 'coverage', '.attest', '.cache', '.next', '.nuxt',
+  'target', 'bower_components', '.venv', 'venv',
+]);
 const PEM_BEGIN = '-'.repeat(5) + 'BEGIN ';
 const PEM_PRIVATE_KEY = 'PRIVATE' + ' KEY';
 const PEM_FENCE = '-'.repeat(5);
@@ -29,11 +34,6 @@ const SECRET_PATTERNS = [
 
 function redact(value: string): string {
   return SECRET_PATTERNS.reduce((text, pattern) => text.replace(pattern, '[REDACTED]'), value);
-}
-
-function commitUuid(hash: string): string {
-  const compact = createHash('sha256').update(hash).digest('hex').slice(0, 32);
-  return `${compact.slice(0, 8)}-${compact.slice(8, 12)}-5${compact.slice(13, 16)}-a${compact.slice(17, 20)}-${compact.slice(20)}`;
 }
 
 function classify(message: string, files: string[]): { type: string; claim: string } {
@@ -70,24 +70,53 @@ export async function scanRepository(cwd: string, requestedLimit = MAX_COMMITS):
   const remoteUrl = remotes.find((remote) => remote.name === 'origin')?.refs.fetch ?? '';
   const githubPath = /(?:https:\/\/(?:[^/@]+@)?github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/i.exec(remoteUrl)?.[1]?.replace(/\.git$/i, '');
   const limit = Number.isFinite(requestedLimit) ? Math.min(MAX_EVIDENCE, Math.max(1, Math.floor(requestedLimit))) : MAX_COMMITS;
-  const log = await git.log({ maxCount: limit });
-  if (log.total === 0) throw new Error('No git commits found in this repository.');
-  const commits = log.all.slice(0, limit).reverse();
+  const head = await git.raw(['rev-parse', '--verify', 'HEAD']).catch((error: unknown) => {
+    if (error instanceof Error && /Needed a single revision/.test(error.message)) return '';
+    throw error;
+  });
+  if (!head.trim()) return { handle: '', evidence: [] };
+  const format = '%x1e%H%x00%P%x00%cI%x00%s%x00%b%x00';
+  const maxCount = `--max-count=${limit}`;
+  const [fileLog, patchLog] = await Promise.all([
+    git.raw(['log', `--format=${format}`, '--name-only', '--no-renames', '--reverse', maxCount]),
+    git.raw(['log', `--format=${format}`, '-p', '--no-ext-diff', '--unified=1', '--reverse', maxCount]),
+  ]);
+  const parseRecords = (output: string) => output.split('\x1e').filter((record) => record.trim()).map((record) => {
+    const [rawHash, rawParents, committedAt, subject, body, ...details] = record.split('\0');
+    const hash = rawHash?.trim();
+    if (!hash || !committedAt || subject === undefined || body === undefined) {
+      throw new Error('Git returned an incomplete commit record while scanning.');
+    }
+    return {
+      hash,
+      parents: rawParents?.trim() ? rawParents.trim().split(/\s+/) : [],
+      committedAt,
+      message: redact(`${subject}\n${body}`.trim()).slice(0, 1000),
+      details: details.join('\0'),
+    };
+  });
+  const filesByCommit = new Map(parseRecords(fileLog).map((commit) => [
+    commit.hash,
+    commit.details.split(/\r?\n/).map((file) => file.trim()).filter(Boolean).slice(0, 40),
+  ]));
+  const patchByCommit = new Map(parseRecords(patchLog).map((commit) => {
+    const start = commit.details.indexOf('diff --git ');
+    return [commit.hash, start === -1 ? '' : commit.details.slice(start)] as const;
+  }));
+  const commits = parseRecords(fileLog);
+  if (!commits.length) return { handle: '', evidence: [] };
   let previousHash = GENESIS_HASH;
   const evidence: CommitEvidence[] = [];
 
-  for (const commit of commits) {
-    const filesOutput = await git.raw(['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', commit.hash]);
-    const files = filesOutput.split(/\r?\n/).map((file) => file.trim()).filter(Boolean).slice(0, 40);
-    const parentsOutput = await git.raw(['rev-list', '--parents', '-n', '1', commit.hash]);
-    const [, ...parentHashes] = parentsOutput.trim().split(/\s+/);
-    const patch = await git.show([commit.hash, '--format=', '--no-ext-diff', '--unified=1']);
-    const message = redact(`${commit.message}\n${commit.body ?? ''}`.trim()).slice(0, 1000);
+  for (const record of commits) {
+    const files = filesByCommit.get(record.hash) ?? [];
+    const patch = patchByCommit.get(record.hash) ?? '';
+    const message = record.message;
     const classified = classify(message, files);
     const reference = {
-      commit_hash: commit.hash,
-      parent_hashes: parentHashes,
-      committed_at: new Date(commit.date).toISOString(),
+      commit_hash: record.hash,
+      parent_hashes: record.parents,
+      committed_at: new Date(record.committedAt).toISOString(),
       repository: path.basename(root),
       ...(githubPath ? { repository_url: `https://github.com/${githubPath}` } : {}),
       message,
@@ -95,13 +124,13 @@ export async function scanRepository(cwd: string, requestedLimit = MAX_COMMITS):
       quote: quoteFromPatch(patch, message),
     };
     const base = {
-      id: commitUuid(commit.hash),
+      id: randomUUID(),
       claim_type: classified.type,
       claim_value: `${classified.claim}: ${message.split('\n')[0] || '(commit message unavailable)'}`,
       source: 'git',
       status: 'Supported' as const,
       confidence: null,
-      captured_at: Date.parse(commit.date),
+      captured_at: Date.parse(record.committedAt),
     };
     const chainHash = await createChainHash(previousHash, base, reference);
     const node: CommitEvidence = {
@@ -112,6 +141,83 @@ export async function scanRepository(cwd: string, requestedLimit = MAX_COMMITS):
     previousHash = chainHash;
   }
   return { handle: '', evidence };
+}
+
+async function findRepositories(parent: string): Promise<string[]> {
+  const repositories: string[] = [];
+  const pending = [parent];
+  const visited = new Set<string>();
+  while (pending.length) {
+    const directory = pending.pop()!;
+    const normalized = path.resolve(directory).toLowerCase();
+    if (visited.has(normalized)) continue;
+    visited.add(normalized);
+    const entries = await readdir(directory, { withFileTypes: true });
+    if (entries.some((entry) => entry.name === '.git')) {
+      repositories.push(directory);
+      if (repositories.length > MAX_REPOSITORIES) {
+        throw new Error(`Found more than ${MAX_REPOSITORIES} git repositories. Choose a smaller parent folder.`);
+      }
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || IGNORED_DIRECTORY_NAMES.has(entry.name.toLowerCase())) continue;
+      pending.push(path.join(directory, entry.name));
+    }
+  }
+  return repositories.sort((left, right) => left.localeCompare(right));
+}
+
+async function rechainEvidence(items: CommitEvidence[]): Promise<CommitEvidence[]> {
+  const ordered = [...items].sort((left, right) => left.captured_at - right.captured_at);
+  let previousHash = GENESIS_HASH;
+  const chained: CommitEvidence[] = [];
+  for (const item of ordered) {
+    const { evidence_ref: originalReference, ...base } = item;
+    const { previous_hash: _previousHash, chain_hash: _chainHash, ...reference } = originalReference;
+    const chainHash = await createChainHash(previousHash, base, reference);
+    chained.push({
+      ...base,
+      evidence_ref: { ...reference, previous_hash: previousHash, chain_hash: chainHash },
+    });
+    previousHash = chainHash;
+  }
+  return chained;
+}
+
+export async function scanRepositories(
+  parent: string,
+  requestedLimit = MAX_COMMITS,
+): Promise<{ payload: SyncPayload; repositories: string[]; skippedEmpty: number }> {
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(MAX_COMMITS, Math.max(1, Math.floor(requestedLimit)))
+    : MAX_COMMITS;
+  const repositories = await findRepositories(path.resolve(parent));
+  if (!repositories.length) {
+    throw new Error(`No git repositories found under ${path.resolve(parent)}. Choose a folder containing your repositories.`);
+  }
+  const perRepositoryLimit = Math.max(1, Math.ceil(limit / repositories.length));
+  const evidence: CommitEvidence[] = [];
+  const scannedRepositories: string[] = [];
+  let skippedEmpty = 0;
+  for (const repository of repositories) {
+    const result = await scanRepository(repository, perRepositoryLimit);
+    if (!result.evidence.length) {
+      skippedEmpty++;
+      continue;
+    }
+    evidence.push(...result.evidence);
+    scannedRepositories.push(repository);
+  }
+  if (!evidence.length) throw new Error('The selected folder contains no committed repository work to scan.');
+
+  const selected = [...evidence]
+    .sort((left, right) => right.captured_at - left.captured_at)
+    .slice(0, limit);
+  return {
+    payload: { handle: '', evidence: await rechainEvidence(selected) },
+    repositories: scannedRepositories,
+    skippedEmpty,
+  };
 }
 
 function scanFile(cwd: string): string {
