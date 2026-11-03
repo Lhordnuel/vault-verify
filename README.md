@@ -7,7 +7,7 @@ Evidence comes before scores. Assessment scores are shown with exact quotes from
 ## Stack
 
 - `apps/web`: Vite, React, Tailwind, CodeMirror; built and served as static assets by the Cloudflare Worker.
-- `apps/api`: Hono on Cloudflare Workers; GitHub OAuth/device flow, D1, R2, Queues, and Meta Llama API grading.
+- `apps/api`: Hono on Cloudflare Workers; GitHub OAuth/device flow, D1, R2, Queues, and Meta Model API generation/grading.
 - `packages/cli`: Node.js CLI; scans git history, saves a local preview, and syncs only after confirmation.
 - `packages/core`: shared evidence contracts and deterministic chain hashing.
 
@@ -27,7 +27,7 @@ In another terminal, apply the schema to local D1:
 npm.cmd run db:local -w @attest/api
 ```
 
-Copy `.dev.vars.example` to `apps/api/.dev.vars` and set `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `SESSION_SECRET` (a long random value), and `META_LLAMA_API_KEY`. Register a GitHub OAuth app with callback `http://127.0.0.1:8787/api/auth/github/callback` for local browser sign-in. The local Worker command sets `APP_ORIGIN=http://127.0.0.1:5173` automatically. GitHub device flow is used by the CLI. Until OAuth credentials are configured, clicking sign-in explains the missing setup instead of silently sending you to GitHub.
+Copy `.dev.vars.example` to `apps/api/.dev.vars` and set `GH_CLIENT_ID`, `GH_CLIENT_SECRET`, `SESSION_SECRET` (a long random value), and a Meta Model API key as `META_API_KEY`. Register a GitHub OAuth app with callback `http://127.0.0.1:8787/api/auth/github/callback` for local browser sign-in. The local Worker command sets `APP_ORIGIN=http://127.0.0.1:5173` automatically. GitHub device flow is used by the CLI. Until OAuth credentials are configured, clicking sign-in explains the missing setup instead of silently sending you to GitHub.
 
 Open `http://localhost:5173`. From the Attest source repository, the CLI commands are:
 
@@ -59,10 +59,10 @@ npx.cmd wrangler r2 bucket create attest-artifacts
 npx.cmd wrangler secret put GH_CLIENT_ID
 npx.cmd wrangler secret put GH_CLIENT_SECRET
 npx.cmd wrangler secret put SESSION_SECRET
-npx.cmd wrangler secret put META_LLAMA_API_KEY
+npx.cmd wrangler secret put META_API_KEY
 ```
 
-Use your GitHub OAuth App credentials, a random `SESSION_SECRET`, and your Meta Llama API key. Enter secrets only into Wrangler's secure prompt; never commit them. Llama 3.3 70B generates tests and grades pass one; Llama 4 Scout grades pass two.
+Use your GitHub OAuth App credentials, a random `SESSION_SECRET`, and a Meta Model API key. Enter secrets only into Wrangler's secure prompt; never commit them. The Worker accepts `META_API_KEY` (and temporarily supports the previous `META_LLAMA_API_KEY` binding). Tests are generated with Muse Spark 1.3 and independently graded by Muse Spark 1.3 and Muse Wonder 1.0 via `https://api.meta.ai/v1/chat/completions`.
 
 Deploy the complete app (API plus static assets) with `npm.cmd run deploy -w @attest/api`. Register the GitHub OAuth callback as `<workers.dev URL>/api/auth/github/callback`, set `ATTEST_API_URL` to that URL in the terminal for CLI use, then test `login`, `scan`, `sync`, and `wipe`.
 
@@ -72,12 +72,12 @@ Publishing the CLI to npm still requires an available owned package scope and np
 
 - `POST /api/cli/sync` verifies and stores a locally built evidence chain.
 - `DELETE /api/cli/wipe` removes uploaded evidence, assessments, and R2 artifacts for the authenticated user.
-- `POST /api/test/generate` creates an evidence-specific exercise with Llama 3.3 70B.
+- `POST /api/test/generate` creates an evidence-specific exercise with Meta Muse Spark.
 - `POST /api/test/submit` stores the submission and queues grading.
 - `GET /api/test/:id` returns both grading passes, exact evidence quotes, agreement, and review status.
 - `GET /api/evidence/:handle` returns the public evidence profile and assessment outcomes.
 - `GET /api/og/:handle` serves the profile social-preview image.
 
-The queue runs Llama 3.3 70B and Llama 4 Scout independently. A score difference greater than 8 points, missing grounded scores, or grader confidence below 0.7 requires human review.
+The queue runs Meta Muse Spark and Muse Wonder independently. A score difference greater than 8 points, missing grounded scores, or grader confidence below 0.7 requires human review. Public profiles can be shared by URL or printed to PDF for a job application; choose "Save as PDF" in the browser print dialog.
 
 Commit references support review of what is recorded in repository history; a local scan does not independently prove who authored a change. Scores and profile copy must not imply authorship or overall personal merit.

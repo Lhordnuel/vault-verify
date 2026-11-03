@@ -51,8 +51,15 @@ type Test = { id: string; test_prompt: string; starter_code: string; rubric_inst
 function api<T>(url: string, init?: RequestInit): Promise<T> {
   return fetch(url, { credentials: 'include', ...init }).then(async (response) => {
     if (!response.ok) {
-      const body = await response.json().catch(() => ({})) as { error?: string };
-      throw new Error(body.error ?? `Request failed (${response.status})`);
+      const body = await response.json().catch(() => ({})) as { error?: string; message?: string };
+      const detail = body.message && body.error === 'internal_error' ? body.message : body.error ?? body.message;
+      const knownErrors: Record<string, string> = {
+        evidence_required: 'Sync your reviewed git evidence before generating a test.',
+        meta_model_api_not_configured: 'Meta Model API is not configured for this deployment.',
+        model_returned_invalid_test: 'Meta could not produce a valid exercise. Try generating the test again.',
+        assessment_not_submittable: 'This assessment cannot be submitted in its current state.',
+      };
+      throw new Error((detail && knownErrors[detail]) ?? detail ?? `Request failed (${response.status})`);
     }
     return response.json() as Promise<T>;
   });
@@ -126,7 +133,7 @@ function GradeCard({ grade }: { grade: Grade }) {
       </div>
       <p className="agreement-line">Independent grader agreement: {grade.agreement === null ? 'Unverified' : `${grade.agreement.toFixed(1)}%`}</p>
       <div className="grade-passes">
-        {[['Pass 1 · Llama 3.3', grade.pass1], ['Pass 2 · Llama 4 Scout', grade.pass2]].map(([label, pass]) => {
+        {[['Pass 1 · Muse Spark 1.3', grade.pass1], ['Pass 2 · Muse Wonder 1.0', grade.pass2]].map(([label, pass]) => {
           const result = pass as Grade['pass1'];
           return <div className="grade-pass" key={label as string}>
             <div className="pass-label">{label as string}<strong>{result.overall === null ? '—' : `${result.overall}/100`}</strong></div>
@@ -150,6 +157,9 @@ function ProfilePage({ handle }: { handle: string }) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const isOwner = session?.handle === profile?.handle;
+  useEffect(() => {
+    if (profile) document.title = `${profile.handle} - Attest evidence profile`;
+  }, [profile?.handle]);
   const loadProfile = async () => {
     setRefreshing(true);
     setError('');
@@ -187,6 +197,23 @@ function ProfilePage({ handle }: { handle: string }) {
     } catch {
       setNotice('Clipboard access is unavailable. Select and copy the text below.');
     }
+  };
+  const shareProfile = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Attest evidence profile: ${profile?.handle ?? handle}`,
+          text: 'Specific claims, backed by cited evidence.',
+          url: profileUrl,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          setError(`Unable to share profile: ${err.message}`);
+        }
+      }
+      return;
+    }
+    await copyText(profileUrl, 'Profile link copied.');
   };
   const wipeEvidence = async () => {
     if (!window.confirm('Permanently delete all uploaded evidence, assessments, and stored artifacts for this account? This cannot be undone.')) return;
@@ -230,8 +257,17 @@ function ProfilePage({ handle }: { handle: string }) {
     <section className="profile-hero">
       <div className="avatar">{profile.handle.slice(0, 1).toUpperCase()}</div>
       <div><p className="eyebrow">EVIDENCE PROFILE</p><h1>{profile.handle}<span className="muted"> /</span></h1><a className="github-link" href={`https://github.com/${encodeURIComponent(profile.github_username)}`} target="_blank" rel="noreferrer">@{profile.github_username} ↗</a></div>
-      <div className="profile-actions"><button className="button primary" disabled={!isOwner || !profile.claims.length || busy} onClick={startAssessment}>{busy ? 'Preparing…' : 'Take an evidence-based test'}</button><span>{!isOwner ? 'Sign in as the profile owner to start an assessment.' : !profile.claims.length ? 'Sync reviewed evidence before generating a test.' : 'Scores only appear with cited evidence.'}</span></div>
+      <div className="profile-actions">
+        <div className="profile-export-actions">
+          <button className="button secondary" onClick={() => void shareProfile()}>Share profile</button>
+          <button className="button secondary" onClick={() => window.print()} title="Choose Save as PDF in the print dialog">Download PDF</button>
+        </div>
+        <span className="export-hint">For a file, choose “Save as PDF” in the print dialog.</span>
+        <button className="button primary" disabled={!isOwner || !profile.claims.length || busy} onClick={startAssessment}>{busy ? 'Preparing…' : 'Take an evidence-based test'}</button>
+        <span>{!isOwner ? 'Sign in as the profile owner to start an assessment.' : !profile.claims.length ? 'Sync reviewed evidence before generating a test.' : 'Scores only appear with cited evidence.'}</span>
+      </div>
     </section>
+    <div className="print-heading"><span>ATTEST / EVIDENCE CREDENTIAL</span><span>{window.location.host}</span></div>
     <div className="notice"><span>◎</span> Attest means these specific claims have supporting evidence — not that a person is good. Git history is a source citation, not independent proof of authorship.</div>
     {isOwner && <section className="owner-tools">
       <div className="owner-tool-heading"><div><p className="eyebrow">YOUR ATTEST ACCOUNT</p><h2>Get your evidence on this profile</h2></div>
@@ -268,6 +304,7 @@ function ProfilePage({ handle }: { handle: string }) {
     {latestGrade && <GradeCard grade={latestGrade} />}
     {error && <p className="error inline-error" role="alert">{error}</p>}
     {notice && <p className="action-notice" role="status">{notice}</p>}
+    <p className="print-disclaimer">This profile documents specific claims and their cited sources. It is not a judgment of a person's overall ability. Git history is a source citation, not independent proof of authorship.</p>
     <footer className="profile-footer">Evidence can be reviewed and revoked by its owner. Missing evidence is unverified, never guessed.</footer>
   </main>;
 }
@@ -302,11 +339,23 @@ function TakePage({ id }: { id: string }) {
           setGrade(result.ai_grade);
           if (result.status !== 'grading') setStatus(result.status);
         }
-      }).catch(() => undefined);
+      }).catch((err: Error) => {
+        if (active) setError(`Unable to check grading status: ${err.message}`);
+      });
     }, 2500);
     return () => { active = false; window.clearInterval(timer); };
   }, [status, id]);
   const competencyNames = useMemo(() => test?.rubric_instance.criteria.map((item) => item.skill).join(' · ') ?? '', [test]);
+  const canSubmit = status === '' || status === 'pending' || status === 'failed';
+  const statusMessage = status === 'failed'
+    ? 'Grading did not complete. Check the Meta API configuration and submit again to retry.'
+    : status === 'human_review_required'
+      ? 'Automated graders disagree or lack confidence; this result is flagged for human review.'
+      : status === 'grading'
+        ? 'Two independent graders are reviewing your response…'
+        : status
+          ? `Status: ${status.replace(/_/g, ' ')}`
+          : 'Submission is sent only when you press submit.';
   if (error && !test) return <main className="page-shell"><p className="error">{error}</p></main>;
   if (!test) return <main className="page-shell"><p className="muted">Loading assessment…</p></main>;
   return <main className="page-shell take-shell">
@@ -315,7 +364,7 @@ function TakePage({ id }: { id: string }) {
     <div className="editor-frame"><div className="editor-bar"><span>submission.js</span><span>YOUR WORK STAYS PRIVATE UNTIL SUBMITTED</span></div>
       <Suspense fallback={<div className="editor-loading">Loading editor…</div>}><CodeEditor value={code} onChange={setCode} editable={status !== 'grading' && status !== 'graded'} /></Suspense>
     </div>
-    <div className="submit-row"><span>{status === 'grading' ? 'Two independent graders are reviewing your response…' : status ? `Status: ${status.replace(/_/g, ' ')}` : 'Submission is sent only when you press submit.'}</span><button className="button primary" onClick={submit} disabled={status === 'grading' || status === 'graded'}>Submit for grading <span>→</span></button></div>
+    <div className="submit-row"><span>{statusMessage}</span><button className="button primary" onClick={submit} disabled={!canSubmit}>Submit for grading <span>→</span></button></div>
     {grade && <GradeCard grade={grade} />}
     {error && <p className="error">{error}</p>}
   </main>;

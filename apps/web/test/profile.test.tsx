@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App.js';
 
@@ -10,12 +10,35 @@ const profile = {
   assessments: [],
   signal_summary: 'No significant signals detected.',
 };
+const profileWithEvidence = {
+  ...profile,
+  claims: [{
+    id: 'claim-1',
+    claim_type: 'api-design',
+    claim_value: 'API development: Add profile endpoint',
+    status: 'Supported',
+    confidence: null,
+    captured_at: 1_767_000_000_000,
+    evidence_ref: {
+      commit_hash: 'a'.repeat(40),
+      committed_at: '2026-11-01T12:00:00.000Z',
+      repository: 'sample',
+      repository_url: 'https://github.com/dev/sample',
+      message: 'Add profile endpoint',
+      files: ['src/profile.ts'],
+      quote: 'export function getProfile() { return profile; }',
+      previous_hash: '0'.repeat(64),
+      chain_hash: 'b'.repeat(64),
+    },
+  }],
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   window.history.pushState({}, '', '/');
 });
@@ -36,6 +59,43 @@ describe('evidence profile dashboard', () => {
     expect(screen.getByText(/ATTEST_API_URL/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Take an evidence-based test' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: 'Delete all uploaded evidence' })).toBeTruthy();
+  });
+
+  it('offers profile sharing and a printable PDF export', async () => {
+    window.history.pushState({}, '', '/v/dev');
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('/api/evidence/')) return jsonResponse(profile);
+      if (url.endsWith('/api/cli/me')) return jsonResponse({ error: 'authentication_required' }, 401);
+      return jsonResponse({ error: 'not_found' }, 404);
+    }));
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+
+    render(<App />);
+
+    expect(await screen.findByRole('link', { name: /Sign in with GitHub/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Share profile' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    expect(print).toHaveBeenCalledOnce();
+  });
+
+  it('shows the Meta provider error when evidence-based test generation fails', async () => {
+    window.history.pushState({}, '', '/v/dev');
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/evidence/')) return jsonResponse(profileWithEvidence);
+      if (url.endsWith('/api/cli/me')) return jsonResponse({ handle: 'dev', username: 'dev' });
+      if (url.endsWith('/api/test/generate') && init?.method === 'POST') {
+        return jsonResponse({ error: 'internal_error', message: 'Meta Model API returned HTTP 401: Invalid API key.' }, 500);
+      }
+      return jsonResponse({ error: 'not_found' }, 404);
+    }));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Take an evidence-based test' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Meta Model API returned HTTP 401: Invalid API key.');
   });
 
   it('requires explicit confirmation before wiping, then reloads the profile', async () => {

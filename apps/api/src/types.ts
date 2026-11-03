@@ -7,7 +7,8 @@ export interface Bindings {
   GH_CLIENT_ID: string;
   GH_CLIENT_SECRET: string;
   SESSION_SECRET: string;
-  META_LLAMA_API_KEY: string;
+  META_API_KEY?: string;
+  META_LLAMA_API_KEY?: string;
   APP_ORIGIN?: string;
 }
 
