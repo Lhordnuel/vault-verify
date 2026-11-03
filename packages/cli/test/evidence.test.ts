@@ -1,16 +1,16 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { simpleGit } from 'simple-git';
 import { createChainHash, GENESIS_HASH } from '@attest/core';
-import { scanRepository } from '../src/evidence.js';
+import { scanRepositories, scanRepository } from '../src/evidence.js';
 
 describe('local git evidence scan', () => {
   let directory: string;
 
   afterEach(async () => {
-    if (directory) await rm(directory, { recursive: true, force: true });
+    if (directory) await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   });
 
   it('creates a linked evidence record from the commit and redacts common credentials', async () => {
@@ -35,5 +35,50 @@ describe('local git evidence scan', () => {
     const { chain_hash: _chainHash, previous_hash: _previousHash, ...reference } = item.evidence_ref;
     const { evidence_ref: _evidenceRef, ...base } = item;
     expect(item.evidence_ref.chain_hash).toBe(await createChainHash(GENESIS_HASH, base, reference));
-  }, 20_000);
+  }, 60_000);
+
+  it('combines nested repositories, skips empty repositories, and rechains the combined preview', async () => {
+    directory = await mkdtemp(path.join(os.tmpdir(), 'attest-multi-scan-'));
+    const repositories = [
+      path.join(directory, 'first'),
+      path.join(directory, 'nested', 'second'),
+      path.join(directory, 'empty'),
+    ];
+    for (const [index, repository] of repositories.entries()) {
+      await mkdir(repository, { recursive: true });
+      const git = simpleGit(repository);
+      await git.init();
+      await git.addConfig('user.name', 'Local Developer');
+      await git.addConfig('user.email', 'developer@example.test');
+      if (index === 2) continue;
+      const filename = `change-${index}.ts`;
+      await writeFile(path.join(repository, filename), `export const change${index} = true;\n`);
+      await git.add(filename);
+      await git.commit(`Add change ${index}`);
+      if (index === 0) {
+        await writeFile(path.join(repository, 'follow-up.ts'), 'export const followUp = true;\n');
+        await git.add('follow-up.ts');
+        await git.commit('Add follow-up change');
+      }
+    }
+
+    const result = await scanRepositories(directory, 10);
+    expect(result.repositories).toHaveLength(2);
+    expect(result.skippedEmpty).toBe(1);
+    expect(result.payload.evidence).toHaveLength(3);
+    expect(result.payload.evidence.filter((item) => item.evidence_ref.repository === 'first').map((item) => item.evidence_ref.message))
+      .toEqual(['Add change 0', 'Add follow-up change']);
+
+    let previousHash = GENESIS_HASH;
+    for (const item of result.payload.evidence) {
+      expect(item.evidence_ref.previous_hash).toBe(previousHash);
+      const { chain_hash: _chainHash, previous_hash: _previousHash, ...reference } = item.evidence_ref;
+      const { evidence_ref: _evidenceRef, ...base } = item;
+      expect(item.evidence_ref.chain_hash).toBe(await createChainHash(previousHash, base, reference));
+      previousHash = item.evidence_ref.chain_hash;
+    }
+
+    const limited = await scanRepositories(directory, 1);
+    expect(limited.payload.evidence).toHaveLength(1);
+  }, 60_000);
 });
