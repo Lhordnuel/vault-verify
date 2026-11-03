@@ -2,7 +2,7 @@ export interface CommitEvidence {
   id: string;
   claim_type: string;
   claim_value: string;
-  source: string;
+  source: 'git';
   status: 'Supported';
   confidence: null;
   evidence_ref: {
@@ -20,10 +20,38 @@ export interface CommitEvidence {
   captured_at: number;
 }
 
+export interface SessionEvidence {
+  id: string;
+  claim_type: string;
+  claim_value: string;
+  source: 'session';
+  status: 'Supported' | 'Unverified';
+  confidence: null;
+  evidence_ref: {
+    session_id: string;
+    format: string;
+    event_id: string;
+    event_type: string;
+    actor: string;
+    occurred_at: string;
+    quote: string;
+    verification_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
+    verification_reasons: string[];
+    previous_hash: string;
+    chain_hash: string;
+  };
+  captured_at: number;
+}
+
+export type EvidenceNode = CommitEvidence | SessionEvidence;
+
 export interface SyncPayload {
   handle: string;
-  evidence: CommitEvidence[];
+  evidence: EvidenceNode[];
 }
+
+export { parseSessionLogText, sessionEvidenceFromImport } from './session-log.js';
+export type { ImportedSessionEvent, ImportedSessionLog } from './session-log.js';
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -46,8 +74,8 @@ export async function sha256(value: string): Promise<string> {
 
 export async function createChainHash(
   previousHash: string,
-  evidence: Omit<CommitEvidence, 'evidence_ref'>,
-  reference: Omit<CommitEvidence['evidence_ref'], 'previous_hash' | 'chain_hash'>,
+  evidence: Record<string, unknown>,
+  reference: Record<string, unknown>,
 ): Promise<string> {
   return sha256(`${previousHash}\n${canonicalJson({ ...evidence, evidence_ref: reference })}`);
 }

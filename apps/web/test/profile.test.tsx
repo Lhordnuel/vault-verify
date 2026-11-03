@@ -16,6 +16,7 @@ const profileWithEvidence = {
     id: 'claim-1',
     claim_type: 'api-design',
     claim_value: 'API development: Add profile endpoint',
+    source: 'git',
     status: 'Supported',
     confidence: null,
     captured_at: 1_767_000_000_000,
@@ -44,6 +45,56 @@ afterEach(() => {
 });
 
 describe('evidence profile dashboard', () => {
+  it('requires answers to the standardized fifteen questions and two scenarios', async () => {
+    window.history.pushState({}, '', '/take/assessment-1');
+    const assessment = {
+      id: 'assessment-1',
+      title: 'Evidence-grounded software engineering',
+      instructions: 'Answer each question and explain the scenario decisions.',
+      multiple_choice: Array.from({ length: 15 }, (_, index) => ({
+        id: `question-${index}`,
+        skill: 'testing',
+        question: `Question ${index + 1}?`,
+        options: ['First choice', 'Second choice', 'Third choice', 'Fourth choice'],
+      })),
+      scenarios: [
+        { id: 'scenario-1', skill: 'debugging', prompt: 'A regression appears after a change. How would you diagnose it and verify the fix?' },
+        { id: 'scenario-2', skill: 'tradeoffs', prompt: 'A proposed fix adds complexity. How would you assess the tradeoff and choose an approach?' },
+      ],
+      evidence_basis: [],
+      rubric_instance: { criteria: [{ skill: 'testing', weight: 100, description: 'Testing' }] },
+      status: 'pending',
+      ai_grade: null,
+    };
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === 'POST') return jsonResponse({ status: 'grading', id: 'assessment-1' }, 202);
+      return jsonResponse(assessment);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+
+    expect(await screen.findByText('15 MULTIPLE CHOICE · 2 SCENARIOS')).toBeTruthy();
+    const submit = screen.getByRole('button', { name: /Submit assessment/ }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    const answerOptions = screen.getAllByRole('radio');
+    for (let index = 0; index < 15; index += 1) {
+      fireEvent.click(answerOptions[index * 4]);
+    }
+    fireEvent.change(screen.getByRole('textbox', { name: 'Scenario 1 response' }), { target: { value: 'I would reproduce the issue, isolate the change, add a regression test, and rerun the suite.' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Scenario 2 response' }), { target: { value: 'I would compare correctness, maintainability, and operational risk, then test the smallest safe change.' } });
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/test/submit',
+      expect.objectContaining({ method: 'POST' }),
+    ));
+    const request = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    const body = JSON.parse(String(request?.[1]?.body)) as { submission: string };
+    const submission = JSON.parse(body.submission) as { answers: Record<string, number>; scenario_answers: Record<string, string> };
+    expect(Object.keys(submission.answers)).toHaveLength(15);
+    expect(Object.keys(submission.scenario_answers)).toHaveLength(2);
+  });
+
   it('shows the CLI evidence workflow and prevents testing without evidence', async () => {
     window.history.pushState({}, '', '/v/dev');
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
@@ -56,6 +107,8 @@ describe('evidence profile dashboard', () => {
     render(<App />);
 
     expect(await screen.findByText('Get your evidence on this profile')).toBeTruthy();
+    expect(screen.getByText('ATTEST × VAULTIO / CANDIDATE REPORT')).toBeTruthy();
+    expect(screen.getByText('Import an AI session log')).toBeTruthy();
     expect(screen.getByText(/ATTEST_API_URL/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Take an evidence-based test' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: 'Delete all uploaded evidence' })).toBeTruthy();

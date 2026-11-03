@@ -1,12 +1,12 @@
 # Attest
 
-Attest turns local git history into a portable, revocable credential at `attest.sh/v/{handle}`. Each claim links to a commit, changed files, a quoted excerpt, and a tamper-evident SHA-256 chain. Attest means **these specific claims have supporting evidence**—not that a person is good.
+Attest turns reviewed git history and imported AI coding-session records into a portable, revocable candidate report at `attest.sh/v/{handle}`. Git claims link to commits, changed files, quoted excerpts, and a tamper-evident SHA-256 chain; imported session events are separately labeled and chained. Attest means **these specific claims have supporting evidence**—not that a person is good.
 
 Evidence comes before scores. Assessment scores are shown with exact quotes from the candidate's submission; absent or ungrounded evidence produces `null`. Language is limited to **Supported**, **Partially supported**, **Unverified**, and **Contradicted**. The product never calls people dishonest, and an empty result says **No significant signals detected**. Local scans are private; nothing uploads unless the user runs `attest sync` and confirms the exact request preview.
 
 ## Stack
 
-- `apps/web`: Vite, React, Tailwind, CodeMirror; built and served as static assets by the Cloudflare Worker.
+- `apps/web`: Vite, React, Tailwind; built and served as static assets by the Cloudflare Worker.
 - `apps/api`: Hono on Cloudflare Workers; GitHub OAuth/device flow, D1, R2, Queues, and Meta Model API generation/grading.
 - `packages/cli`: Node.js CLI; scans git history, saves a local preview, and syncs only after confirmation.
 - `packages/core`: shared evidence contracts and deterministic chain hashing.
@@ -40,7 +40,15 @@ Open `http://localhost:5173`. From the Attest source repository, the CLI command
 
 The `.cmd` launcher avoids PowerShell's `npx.ps1` execution-policy error. It defaults to the live Attest Worker; override it with `ATTEST_API_URL` or `--api`. Invoke the launcher by full path from another git repository while keeping that repository as the current directory; the scanner uses the current directory. Do not run `npx attest`: the public npm package name is owned by an unrelated project. This CLI is private until it can be published under an available, owned package scope.
 
-`scan` writes only to `.attest/scan.json`; it does not upload. `sync` prints the complete JSON request, explains that it replaces the previous evidence snapshot, asks for confirmation, and only then uploads it. `wipe` requires a separate confirmation and deletes that account's uploaded evidence, assessments, and R2 artifacts.
+`scan` writes only to `.attest/scan.json`; it does not upload. To include a Claude Code JSONL export or normalized Attest/Vaultio session log, pass `--session`:
+
+```sh
+.\attest.cmd scan --session C:\path\to\session.jsonl
+```
+
+Session imports are parsed and redacted locally. A supplied hash/signature chain can be integrity-checked, but keys and logs supplied by the candidate do not establish who authored the transcript; imported records remain **Unverified**. The browser profile also offers a local paste/upload verifier for Claude Code JSONL, `attest-session-log/1`, and the earlier `vv-session-log/1` format.
+
+`sync` prints the complete JSON request, explains that it replaces the previous evidence snapshot, asks for confirmation, and only then uploads it. `wipe` requires a separate confirmation and deletes that account's uploaded evidence, assessments, and R2 artifacts.
 
 ## Cloudflare resources and deployment
 
@@ -72,12 +80,12 @@ Publishing the CLI to npm still requires an available owned package scope and np
 
 - `POST /api/cli/sync` verifies and stores a locally built evidence chain.
 - `DELETE /api/cli/wipe` removes uploaded evidence, assessments, and R2 artifacts for the authenticated user.
-- `POST /api/test/generate` creates an evidence-specific exercise with Meta Muse Spark.
-- `POST /api/test/submit` stores the submission and queues grading.
+- `POST /api/test/generate` creates a consistent 15-question multiple-choice and 2-scenario assessment, tailored to the candidate's available git/session evidence.
+- `POST /api/test/submit` validates all 17 answers, stores the submission, and queues two independent grading passes. The answer key is never returned to the browser.
 - `GET /api/test/:id` returns both grading passes, exact evidence quotes, agreement, and review status.
 - `GET /api/evidence/:handle` returns the public evidence profile and assessment outcomes.
 - `GET /api/og/:handle` serves the profile social-preview image.
 
-The queue runs Meta Muse Spark and Muse Wonder independently. A score difference greater than 8 points, missing grounded scores, or grader confidence below 0.7 requires human review. Public profiles can be shared by URL or printed to PDF for a job application; choose "Save as PDF" in the browser print dialog.
+The queue scores the multiple-choice section deterministically and runs Meta Muse Spark and Muse Wonder independently on scenario responses. Scenario scores require exact answer quotes plus citations to shared evidence; a score difference greater than 8 points, missing grounded scores, or grader confidence below 0.7 requires human review. Public Attest × Vaultio reports show source coverage, session timelines, supported claims, and areas not established by shared evidence. They can be shared by URL or printed to PDF; choose "Save as PDF" in the browser print dialog.
 
 Commit references support review of what is recorded in repository history; a local scan does not independently prove who authored a change. Scores and profile copy must not imply authorship or overall personal merit.

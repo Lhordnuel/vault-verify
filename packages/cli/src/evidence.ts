@@ -98,7 +98,7 @@ export async function scanRepository(cwd: string, requestedLimit = MAX_COMMITS):
       id: commitUuid(commit.hash),
       claim_type: classified.type,
       claim_value: `${classified.claim}: ${message.split('\n')[0] || '(commit message unavailable)'}`,
-      source: 'git',
+      source: 'git' as const,
       status: 'Supported' as const,
       confidence: null,
       captured_at: Date.parse(commit.date),
