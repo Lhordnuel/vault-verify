@@ -16,6 +16,18 @@ async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function uploadEvidence(apiUrl: string, token: string, payload: SyncPayload): Promise<number> {
+  const response = await fetch(`${apiUrl}/api/cli/sync`, {
+    method: 'POST',
+    headers: { authorization: ['Bear', 'er ', token].join(''), 'content-type': 'application/json' },
+    body: JSON.stringify({ evidence: payload.evidence }),
+  });
+  const result = await responseJson<{ synced?: number; error?: string }>(response)
+    .catch((): { synced?: number; error?: string } => ({}));
+  if (!response.ok) throw new Error(`Upload failed: ${result.error ?? `HTTP ${response.status}`}.`);
+  return result.synced ?? 0;
+}
+
 async function login(apiUrl: string): Promise<void> {
   const response = await fetch(`${apiUrl}/api/cli/device`, { method: 'POST' });
   if (!response.ok) throw new Error(`Could not start GitHub sign-in (HTTP ${response.status}).`);
@@ -111,6 +123,36 @@ program.command('sync').description('Preview and upload reviewed git evidence af
   if (!response.ok) throw new Error(`Upload failed: ${result.error ?? `HTTP ${response.status}`}.`);
   console.log(`Uploaded ${result.synced ?? 0} evidence items. Profile: ${config.apiUrl}/v/${encodeURIComponent(config.handle ?? '')}`);
 });
+
+program.command('publish')
+  .description('Scan this git repository and publish its evidence after one confirmation.')
+  .action(async () => {
+    const apiUrl = program.opts<{ api: string }>().api.replace(/\/+$/, '');
+    let config = await readConfig(apiUrl);
+    if (!config.token) {
+      console.log('Sign in with GitHub to connect this repository to your profile.');
+      await login(apiUrl);
+      config = await readConfig(apiUrl);
+    }
+    if (!config.token) throw new Error('Sign-in completed without a saved session. Run `attest login` and try again.');
+
+    const repository = process.cwd();
+    console.log(`Scanning git repository: ${repository}`);
+    const payload = await scanRepository(repository);
+    await saveScan(repository, payload);
+    console.log(`Prepared ${payload.evidence.length} evidence records. The scan is saved locally at .attest\\scan.json.`);
+    console.log('Review the local preview before continuing. This replaces the evidence currently on your profile.');
+    const rl = createInterface({ input: stdin, output: stdout });
+    const answer = await rl.question('Type UPLOAD to publish these records, or press Enter to cancel: ');
+    rl.close();
+    if (answer.trim() !== 'UPLOAD') {
+      console.log('Upload cancelled. Nothing was sent; the local preview is unchanged.');
+      return;
+    }
+    const synced = await uploadEvidence(config.apiUrl, config.token, payload);
+    console.log(`Published ${synced} evidence records.`);
+    console.log(`Candidate profile: ${config.apiUrl}/v/${encodeURIComponent(config.handle ?? '')}`);
+  });
 
 program.command('wipe').description('Permanently delete your uploaded evidence and assessments.').action(async () => {
   const opts = program.opts<{ api: string }>();
